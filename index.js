@@ -7,12 +7,14 @@ const { nanoid } = require('nanoid');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const GROUP_ID = process.env.GROUP_ID; // The Inner Circle group chat ID
 
 // Debug: log which vars are missing
 console.log('ENV CHECK:');
 console.log('BOT_TOKEN:', BOT_TOKEN ? '✓ set' : '✗ missing');
 console.log('SUPABASE_URL:', SUPABASE_URL ? '✓ set' : '✗ missing');
 console.log('SUPABASE_SERVICE_KEY:', SUPABASE_KEY ? '✓ set' : '✗ missing');
+console.log('GROUP_ID:', GROUP_ID ? '✓ set' : '✗ missing (optional)');
 
 if (!BOT_TOKEN || !SUPABASE_URL || !SUPABASE_KEY) {
   console.error('Missing environment variables! Check Railway Variables tab.');
@@ -184,38 +186,54 @@ bot.command('invite', async (ctx) => {
     return ctx.reply(`❌ You have no invites remaining.`);
   }
   
-  // Generate invite code
-  const code = nanoid(12);
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
-  
-  const { error } = await supabase
-    .from('inner_circle_invites')
-    .insert({
-      code,
-      created_by: member.id,
-      expires_at: expiresAt.toISOString()
-    });
-  
-  if (error) {
-    console.error(error);
-    return ctx.reply('Something went wrong. Try again later.');
+  if (!GROUP_ID) {
+    return ctx.reply('❌ Group not configured. Ask admin to set GROUP_ID.');
   }
   
-  // Decrement invites
-  await supabase
-    .from('inner_circle_members')
-    .update({ invites_remaining: member.invites_remaining - 1 })
-    .eq('id', member.id);
-  
-  const botUsername = ctx.botInfo.username;
-  
-  return ctx.reply(
-    `🎟️ Your Invite Link\n\n` +
-    `https://t.me/${botUsername}?start=${code}\n\n` +
-    `⏰ Expires in 7 days\n` +
-    `You have ${member.invites_remaining - 1} invite${member.invites_remaining - 1 !== 1 ? 's' : ''} remaining.`
-  );
+  try {
+    // Create actual Telegram group invite link
+    const expireDate = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days
+    
+    const inviteLink = await ctx.telegram.createChatInviteLink(GROUP_ID, {
+      member_limit: 1, // Single use
+      expire_date: expireDate,
+      name: `Invite by ${ctx.from.first_name}`
+    });
+    
+    // Store in database for tracking
+    const code = inviteLink.invite_link.split('/').pop(); // Extract code from link
+    
+    const { error } = await supabase
+      .from('inner_circle_invites')
+      .insert({
+        code,
+        created_by: member.id,
+        expires_at: new Date(expireDate * 1000).toISOString()
+      });
+    
+    if (error) {
+      console.error('DB error:', error);
+      // Continue anyway - link is created
+    }
+    
+    // Decrement invites
+    await supabase
+      .from('inner_circle_members')
+      .update({ invites_remaining: member.invites_remaining - 1 })
+      .eq('id', member.id);
+    
+    return ctx.reply(
+      `🎟️ Your Invite Link\n\n` +
+      `${inviteLink.invite_link}\n\n` +
+      `⏰ Expires in 7 days\n` +
+      `👤 Single use - one person only\n` +
+      `You have ${member.invites_remaining - 1} invite${member.invites_remaining - 1 !== 1 ? 's' : ''} remaining.`
+    );
+    
+  } catch (error) {
+    console.error('Invite creation error:', error);
+    return ctx.reply(`❌ Failed to create invite: ${error.message}\n\nMake sure bot is admin in the group with invite permissions.`);
+  }
 });
 
 // /status command
@@ -555,6 +573,70 @@ bot.on('message', async (ctx, next) => {
   // For safety, we'll skip auto-seeding - users need to DM bot or be explicitly seeded
   
   return next();
+});
+
+// Track new members joining the group
+bot.on('chat_member', async (ctx) => {
+  try {
+    // Only handle joins to our group
+    if (!GROUP_ID || ctx.chat.id.toString() !== GROUP_ID.toString()) return;
+    
+    const update = ctx.chatMember;
+    const newStatus = update.new_chat_member.status;
+    const oldStatus = update.old_chat_member.status;
+    
+    // Check if someone just joined (wasn't a member, now is)
+    const wasNotMember = ['left', 'kicked', 'restricted'].includes(oldStatus) || oldStatus === undefined;
+    const isNowMember = ['member', 'administrator', 'creator'].includes(newStatus);
+    
+    if (wasNotMember && isNowMember) {
+      const user = update.new_chat_member.user;
+      if (user.is_bot) return;
+      
+      // Check if already registered
+      const existing = await getMember(user.id);
+      if (existing) return;
+      
+      // Try to find who invited them (by invite link)
+      const inviteLink = update.invite_link;
+      let invitedBy = null;
+      
+      if (inviteLink) {
+        const code = inviteLink.invite_link.split('/').pop();
+        const { data: invite } = await supabase
+          .from('inner_circle_invites')
+          .select('created_by')
+          .eq('code', code)
+          .single();
+        
+        if (invite) {
+          invitedBy = invite.created_by;
+          
+          // Mark invite as used
+          await supabase
+            .from('inner_circle_invites')
+            .update({ used_at: new Date().toISOString() })
+            .eq('code', code);
+        }
+      }
+      
+      // Register the new member
+      await supabase
+        .from('inner_circle_members')
+        .insert({
+          telegram_id: user.id,
+          telegram_username: user.username || null,
+          telegram_name: user.first_name + (user.last_name ? ' ' + user.last_name : ''),
+          is_founding_member: false,
+          invites_remaining: 2,
+          invited_by: invitedBy
+        });
+      
+      console.log(`New member joined: ${user.first_name} (${user.id})`);
+    }
+  } catch (error) {
+    console.error('chat_member handler error:', error);
+  }
 });
 
 // Error handling
