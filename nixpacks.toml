@@ -1,5 +1,6 @@
 [phases.setup]
-nixPkgs = ["cairo", "pango", "libpng", "libjpeg", "giflib", "librsvg", "pkg-config"]
+nixPkgs = ["cairo", "pango", "libpng", "libjpeg", "giflib", "librsvg", "pkg-config", "fontconfig", "freetype", "dejavu_fonts"]
+aptPkgs = ["fonts-dejavu-core", "fonts-liberation", "fontconfig"]
 
 [phases.install]
 cmds = ["npm install"]

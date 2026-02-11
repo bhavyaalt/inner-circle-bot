@@ -325,14 +325,14 @@ bot.command('card', async (ctx) => {
     
     // Name
     const name = member.telegram_name || ctx.from.first_name || 'Member';
-    context.font = 'bold 28px sans-serif';
+    context.font = 'bold 28px DejaVu Sans';
     context.fillStyle = '#ffffff';
     context.textAlign = 'center';
     context.fillText(name, width / 2, 200);
     
     // Badge
     const badge = member.is_founding_member ? '★ Founding Member' : 'Member';
-    context.font = '20px sans-serif';
+    context.font = '20px DejaVu Sans';
     context.fillStyle = member.is_founding_member ? '#ffd700' : '#e94560';
     context.fillText(badge, width / 2, 235);
     
@@ -341,7 +341,7 @@ bot.command('card', async (ctx) => {
       month: 'short', 
       year: 'numeric' 
     });
-    context.font = '16px sans-serif';
+    context.font = '16px DejaVu Sans';
     context.fillStyle = '#a0a0a0';
     context.fillText(`Member since ${joinDate}`, width / 2, 280);
     
@@ -354,13 +354,13 @@ bot.command('card', async (ctx) => {
     context.stroke();
     
     // CTA text
-    context.font = 'italic 18px sans-serif';
+    context.font = 'italic 18px DejaVu Sans';
     context.fillStyle = '#ffffff';
     context.fillText('"Want in? Ask me for', width / 2, 370);
     context.fillText('an invite"', width / 2, 395);
     
     // Inner Circle branding
-    context.font = 'bold 14px sans-serif';
+    context.font = 'bold 14px DejaVu Sans';
     context.fillStyle = '#e94560';
     context.fillText('INNER CIRCLE', width / 2, 460);
     
