@@ -450,6 +450,107 @@ bot.command('seedmember', async (ctx) => {
   return ctx.reply(`✅ Seeded ${name} as Founding Member!`);
 });
 
+// /seedgroup command (admin only - seeds all members from current group as founding members)
+bot.command('seedgroup', async (ctx) => {
+  const ADMIN_ID = 937787970;
+  
+  if (ctx.from.id !== ADMIN_ID) {
+    return ctx.reply('Admin only command.');
+  }
+  
+  // Must be used in a group
+  if (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup') {
+    return ctx.reply('This command must be used in a group.');
+  }
+  
+  await ctx.reply('🔄 Scanning group members...');
+  
+  try {
+    // Get chat administrators (includes all members in small groups)
+    const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id);
+    
+    let seeded = 0;
+    let skipped = 0;
+    let failed = 0;
+    
+    for (const admin of admins) {
+      const user = admin.user;
+      
+      // Skip bots
+      if (user.is_bot) {
+        skipped++;
+        continue;
+      }
+      
+      // Check if already a member
+      const existing = await getMember(user.id);
+      if (existing) {
+        skipped++;
+        continue;
+      }
+      
+      // Seed as founding member
+      const { error } = await supabase
+        .from('inner_circle_members')
+        .insert({
+          telegram_id: user.id,
+          telegram_username: user.username || null,
+          telegram_name: user.first_name + (user.last_name ? ' ' + user.last_name : ''),
+          is_founding_member: true,
+          invites_remaining: 2,
+          badge: 'Founding Member'
+        });
+      
+      if (error) {
+        console.error(`Failed to seed ${user.id}:`, error);
+        failed++;
+      } else {
+        seeded++;
+      }
+    }
+    
+    // For supergroups, try to get more members using getChatMembersCount
+    const memberCount = await ctx.telegram.getChatMembersCount(ctx.chat.id);
+    
+    return ctx.reply(
+      `✅ Group seeding complete!\n\n` +
+      `👥 Group has ${memberCount} total members\n` +
+      `✅ Seeded: ${seeded} founding members\n` +
+      `⏭️ Skipped: ${skipped} (already members or bots)\n` +
+      `❌ Failed: ${failed}\n\n` +
+      `Note: Only admins/visible members could be seeded. ` +
+      `Regular members should DM the bot - they'll be recognized when they interact.`
+    );
+    
+  } catch (error) {
+    console.error('Seedgroup error:', error);
+    return ctx.reply(`❌ Error: ${error.message}`);
+  }
+});
+
+// /seedchat command - alternative that tries to catch members as they interact
+bot.on('message', async (ctx, next) => {
+  // Only in groups
+  if (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup') {
+    return next();
+  }
+  
+  // Check if this is a group we're tracking (you could add a config for this)
+  // For now, auto-register anyone who messages in a group where bot is present
+  // as a founding member (if not already registered)
+  
+  const user = ctx.from;
+  if (user.is_bot) return next();
+  
+  const existing = await getMember(user.id);
+  if (existing) return next();
+  
+  // Check if we should auto-seed (only if seedgroup was run in this chat)
+  // For safety, we'll skip auto-seeding - users need to DM bot or be explicitly seeded
+  
+  return next();
+});
+
 // Error handling
 bot.catch((err, ctx) => {
   console.error('Bot error:', err);
