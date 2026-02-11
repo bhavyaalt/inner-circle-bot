@@ -3,19 +3,14 @@ const { createClient } = require('@supabase/supabase-js');
 const { createCanvas, loadImage, registerFont } = require('canvas');
 const { nanoid } = require('nanoid');
 const path = require('path');
-const fs = require('fs');
 
-// Try to register fonts if available
+// Register bundled fonts
 try {
-  const fontPaths = [
-    '/nix/store',
-    '/usr/share/fonts',
-    '/usr/local/share/fonts'
-  ];
-  console.log('Looking for fonts...');
-  // Font registration will be handled by fontconfig
+  registerFont(path.join(__dirname, 'fonts', 'Roboto-Regular.ttf'), { family: 'Roboto' });
+  registerFont(path.join(__dirname, 'fonts', 'Roboto-Bold.ttf'), { family: 'Roboto', weight: 'bold' });
+  console.log('✓ Fonts registered successfully');
 } catch (e) {
-  console.log('Font registration skipped:', e.message);
+  console.error('Font registration failed:', e.message);
 }
 
 // Config
@@ -358,14 +353,14 @@ bot.command('card', async (ctx) => {
     
     // Name
     const name = member.telegram_name || ctx.from.first_name || 'Member';
-    context.font = 'bold 28px Sans';
+    context.font = 'bold 28px Roboto';
     context.fillStyle = '#ffffff';
     context.textAlign = 'center';
     context.fillText(name, width / 2, 200);
     
     // Badge
     const badge = member.is_founding_member ? '★ Founding Member' : 'Member';
-    context.font = '20px Sans';
+    context.font = '20px Roboto';
     context.fillStyle = member.is_founding_member ? '#ffd700' : '#e94560';
     context.fillText(badge, width / 2, 235);
     
@@ -374,7 +369,7 @@ bot.command('card', async (ctx) => {
       month: 'short', 
       year: 'numeric' 
     });
-    context.font = '16px Sans';
+    context.font = '16px Roboto';
     context.fillStyle = '#a0a0a0';
     context.fillText(`Member since ${joinDate}`, width / 2, 280);
     
@@ -387,13 +382,13 @@ bot.command('card', async (ctx) => {
     context.stroke();
     
     // CTA text
-    context.font = 'italic 18px Sans';
+    context.font = 'italic 18px Roboto';
     context.fillStyle = '#ffffff';
     context.fillText('"Want in? Ask me for', width / 2, 370);
     context.fillText('an invite"', width / 2, 395);
     
     // Inner Circle branding
-    context.font = 'bold 14px Sans';
+    context.font = 'bold 14px Roboto';
     context.fillStyle = '#e94560';
     context.fillText('INNER CIRCLE', width / 2, 460);
     
