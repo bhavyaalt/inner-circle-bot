@@ -9,7 +9,6 @@ try {
   const fontsDir = path.join(__dirname, 'fonts');
   registerFont(path.join(fontsDir, 'Roboto-Regular.ttf'), { family: 'Roboto' });
   registerFont(path.join(fontsDir, 'Roboto-Bold.ttf'), { family: 'Roboto', weight: 'bold' });
-  registerFont(path.join(fontsDir, 'Roboto-Italic.ttf'), { family: 'Roboto', style: 'italic' });
   console.log('✓ Fonts registered successfully');
 } catch (e) {
   console.error('✗ Font registration failed:', e.message);
@@ -384,7 +383,7 @@ bot.command('card', async (ctx) => {
     context.stroke();
     
     // CTA text
-    context.font = 'italic 18px Roboto';
+    context.font = '18px Roboto';
     context.fillStyle = '#ffffff';
     context.fillText('"Want in? Ask me for', width / 2, 370);
     context.fillText('an invite"', width / 2, 395);
