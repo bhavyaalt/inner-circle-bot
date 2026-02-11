@@ -8,8 +8,14 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
+// Debug: log which vars are missing
+console.log('ENV CHECK:');
+console.log('BOT_TOKEN:', BOT_TOKEN ? '✓ set' : '✗ missing');
+console.log('SUPABASE_URL:', SUPABASE_URL ? '✓ set' : '✗ missing');
+console.log('SUPABASE_SERVICE_KEY:', SUPABASE_KEY ? '✓ set' : '✗ missing');
+
 if (!BOT_TOKEN || !SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('Missing environment variables!');
+  console.error('Missing environment variables! Check Railway Variables tab.');
   process.exit(1);
 }
 
