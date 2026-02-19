@@ -146,6 +146,59 @@ function generateInviteCode() {
     return code;
 }
 
+// Seeded groups functions
+async function addSeededGroup(chatId, chatTitle, seededById) {
+    const { data, error } = await supabase
+        .from('inner_circle_seeded_groups')
+        .upsert({
+            chat_id: chatId.toString(),
+            chat_title: chatTitle,
+            seeded_by: seededById,
+            seeded_at: new Date().toISOString()
+        }, {
+            onConflict: 'chat_id'
+        })
+        .select()
+        .single();
+    
+    if (error) throw error;
+    return data;
+}
+
+async function isSeededGroup(chatId) {
+    const { data, error } = await supabase
+        .from('inner_circle_seeded_groups')
+        .select('chat_id')
+        .eq('chat_id', chatId.toString())
+        .single();
+    
+    if (error && error.code !== 'PGRST116') throw error;
+    return !!data;
+}
+
+async function upsertMember({ telegramId, username, firstName, lastName, isFoundingMember = false, invitedById = null }) {
+    const { data, error } = await supabase
+        .from('inner_circle_members')
+        .upsert({
+            telegram_id: telegramId,
+            username,
+            first_name: firstName,
+            last_name: lastName,
+            is_founding_member: isFoundingMember,
+            invited_by: invitedById,
+            invites_remaining: 2
+        }, {
+            onConflict: 'telegram_id',
+            ignoreDuplicates: true  // Don't update if exists
+        })
+        .select()
+        .single();
+    
+    // Ignore duplicate errors
+    if (error && error.code !== '23505') throw error;
+    return data;
+}
+
 module.exports = {
     supabase,
     getMemberByTelegramId,
@@ -156,5 +209,8 @@ module.exports = {
     getInviteByCode,
     markInviteUsed,
     getInvitesByMember,
-    getMemberStats
+    getMemberStats,
+    addSeededGroup,
+    isSeededGroup,
+    upsertMember
 };

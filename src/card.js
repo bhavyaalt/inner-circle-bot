@@ -1,23 +1,22 @@
-const { createCanvas, loadImage, registerFont } = require('canvas');
+const { createCanvas, loadImage } = require('canvas');
 const https = require('https');
 const http = require('http');
-const fs = require('fs');
-const path = require('path');
 
-// Card dimensions
-const WIDTH = 800;
-const HEIGHT = 420;
+// Card dimensions - matching the SVG design
+const WIDTH = 1024;
+const HEIGHT = 768;
 
-// Colors
+// Colors from the SVG design
 const COLORS = {
-    background: '#0f0f0f',
-    cardBg: '#1a1a2e',
-    primary: '#eab308',      // Gold
-    secondary: '#fbbf24',    // Lighter gold
-    text: '#ffffff',
-    textMuted: '#9ca3af',
-    founding: '#f59e0b',     // Badge color
-    accent: '#16213e'
+    background: '#000000',
+    neonGreen: '#BCFF00',
+    blue: '#0052FF',
+    pink: '#FF9FC2',
+    red: '#FF3500',
+    peach: '#FFA38B',
+    white: '#FFFFFF',
+    gray: '#7C7B7B',
+    darkGray: '#5A5959'
 };
 
 async function downloadImage(url) {
@@ -52,72 +51,167 @@ async function getProfilePhoto(bot, userId) {
     return null;
 }
 
-function formatMemberSince(joinedAt) {
-    const joined = new Date(joinedAt);
-    const now = new Date();
-    const diffMs = now - joined;
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+// Draw a star shape
+function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius) {
+    let rot = Math.PI / 2 * 3;
+    let x = cx;
+    let y = cy;
+    let step = Math.PI / spikes;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - outerRadius);
+    for (let i = 0; i < spikes; i++) {
+        x = cx + Math.cos(rot) * outerRadius;
+        y = cy + Math.sin(rot) * outerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+
+        x = cx + Math.cos(rot) * innerRadius;
+        y = cy + Math.sin(rot) * innerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+    }
+    ctx.lineTo(cx, cy - outerRadius);
+    ctx.closePath();
+}
+
+// Draw starburst decoration in corners
+function drawStarburst(ctx, x, y, scale = 1) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
     
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return '1 day';
-    if (diffDays < 30) return `${diffDays} days`;
-    if (diffDays < 60) return '1 month';
-    const months = Math.floor(diffDays / 30);
-    return `${months} months`;
+    // Main burst lines
+    for (let i = 0; i < 8; i++) {
+        ctx.save();
+        ctx.rotate((Math.PI * 2 / 8) * i);
+        
+        ctx.strokeStyle = COLORS.neonGreen;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, -20);
+        ctx.lineTo(0, -100);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+    
+    // Additional diagonal lines
+    for (let i = 0; i < 8; i++) {
+        ctx.save();
+        ctx.rotate((Math.PI * 2 / 8) * i + Math.PI / 16);
+        
+        ctx.strokeStyle = COLORS.neonGreen;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -15);
+        ctx.lineTo(0, -60);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+    
+    ctx.restore();
+}
+
+// Draw concentric circles (bottom decoration)
+function drawConcentricCircles(ctx, x, y, maxRadius) {
+    // Outer circle
+    ctx.beginPath();
+    ctx.arc(x, y, maxRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = COLORS.red;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Middle circle
+    ctx.beginPath();
+    ctx.arc(x, y, maxRadius * 0.6, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Inner circle
+    ctx.beginPath();
+    ctx.arc(x, y, maxRadius * 0.3, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS.red;
+    ctx.fill();
+}
+
+// Draw member badge (star shape like in SVG)
+function drawMemberBadge(ctx, x, y, radius, isFounding) {
+    ctx.save();
+    ctx.translate(x, y);
+    
+    // Pink badge background
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS.pink;
+    ctx.fill();
+    
+    // Star cutout/overlay
+    ctx.fillStyle = isFounding ? COLORS.peach : COLORS.white;
+    drawStar(ctx, 0, 0, 5, radius * 0.6, radius * 0.25);
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+// Draw blue decorative dots
+function drawBlueDots(ctx, x, y, count = 12) {
+    for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 / count) * i;
+        const dotX = x + Math.cos(angle) * 60;
+        const dotY = y + Math.sin(angle) * 60;
+        
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
+        ctx.fillStyle = COLORS.blue;
+        ctx.fill();
+    }
+}
+
+function formatDate(date) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const d = new Date(date);
+    return `${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 async function generateMemberCard(bot, member) {
     const canvas = createCanvas(WIDTH, HEIGHT);
     const ctx = canvas.getContext('2d');
     
-    // Background gradient
-    const gradient = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
-    gradient.addColorStop(0, COLORS.background);
-    gradient.addColorStop(1, COLORS.accent);
-    ctx.fillStyle = gradient;
+    // Black background
+    ctx.fillStyle = COLORS.background;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
     
-    // Card background with rounded corners
-    const cardX = 30;
-    const cardY = 30;
-    const cardW = WIDTH - 60;
-    const cardH = HEIGHT - 60;
-    const radius = 20;
+    // Draw decorative starbursts in corners
+    drawStarburst(ctx, 0, 0, 1);
+    drawStarburst(ctx, WIDTH, 0, 1);
+    drawStarburst(ctx, 0, HEIGHT, 0.8);
     
+    // Draw blue decorative dots near the profile area
+    drawBlueDots(ctx, 512, 286, 12);
+    
+    // Profile photo area - centered upper portion
+    const photoX = 512;
+    const photoY = 286;
+    const photoRadius = 90;
+    
+    // Profile photo border (pink)
     ctx.beginPath();
-    ctx.moveTo(cardX + radius, cardY);
-    ctx.lineTo(cardX + cardW - radius, cardY);
-    ctx.quadraticCurveTo(cardX + cardW, cardY, cardX + cardW, cardY + radius);
-    ctx.lineTo(cardX + cardW, cardY + cardH - radius);
-    ctx.quadraticCurveTo(cardX + cardW, cardY + cardH, cardX + cardW - radius, cardY + cardH);
-    ctx.lineTo(cardX + radius, cardY + cardH);
-    ctx.quadraticCurveTo(cardX, cardY + cardH, cardX, cardY + cardH - radius);
-    ctx.lineTo(cardX, cardY + radius);
-    ctx.quadraticCurveTo(cardX, cardY, cardX + radius, cardY);
-    ctx.closePath();
-    
-    ctx.fillStyle = COLORS.cardBg;
-    ctx.fill();
-    
-    // Gold border
-    ctx.strokeStyle = COLORS.primary;
-    ctx.lineWidth = 2;
+    ctx.arc(photoX, photoY, photoRadius + 5, 0, Math.PI * 2);
+    ctx.strokeStyle = COLORS.pink;
+    ctx.lineWidth = 3;
     ctx.stroke();
     
-    // Profile photo (circular)
-    const photoX = 100;
-    const photoY = HEIGHT / 2;
-    const photoRadius = 80;
-    
-    // Photo circle background
-    ctx.beginPath();
-    ctx.arc(photoX, photoY, photoRadius + 4, 0, Math.PI * 2);
-    ctx.fillStyle = COLORS.primary;
-    ctx.fill();
-    
+    // Profile photo background
     ctx.beginPath();
     ctx.arc(photoX, photoY, photoRadius, 0, Math.PI * 2);
-    ctx.fillStyle = COLORS.cardBg;
+    ctx.fillStyle = '#1a1a1a';
     ctx.fill();
     
     // Try to load profile photo
@@ -127,70 +221,64 @@ async function generateMemberCard(bot, member) {
         ctx.beginPath();
         ctx.arc(photoX, photoY, photoRadius - 2, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(profilePhoto, photoX - photoRadius + 2, photoY - photoRadius + 2, (photoRadius - 2) * 2, (photoRadius - 2) * 2);
+        ctx.drawImage(profilePhoto, 
+            photoX - photoRadius + 2, 
+            photoY - photoRadius + 2, 
+            (photoRadius - 2) * 2, 
+            (photoRadius - 2) * 2
+        );
         ctx.restore();
     } else {
         // Placeholder initials
-        ctx.fillStyle = COLORS.primary;
-        ctx.font = 'bold 48px Arial';
+        ctx.fillStyle = COLORS.pink;
+        ctx.font = 'bold 60px Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const initials = (member.first_name?.[0] || '') + (member.last_name?.[0] || '');
         ctx.fillText(initials.toUpperCase() || '?', photoX, photoY);
     }
     
-    // Text content
-    const textX = 220;
+    // Member badge (pink star) - position near the badge in original SVG
+    drawMemberBadge(ctx, 512, 478, 100, member.is_founding_member);
     
     // Name
-    ctx.fillStyle = COLORS.text;
-    ctx.font = 'bold 36px Arial';
-    ctx.textAlign = 'left';
+    ctx.fillStyle = COLORS.white;
+    ctx.font = 'bold 42px Arial, sans-serif';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const displayName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.username || 'Member';
-    ctx.fillText(displayName, textX, 80);
+    ctx.fillText(displayName, 512, 400);
     
-    // Username if different from name
-    if (member.username) {
-        ctx.fillStyle = COLORS.textMuted;
-        ctx.font = '20px Arial';
-        ctx.fillText(`@${member.username}`, textX, 125);
-    }
+    // Founding Member / Member badge text
+    ctx.fillStyle = COLORS.red;
+    ctx.font = '24px Arial, sans-serif';
+    const memberType = member.is_founding_member ? 'Founding Member' : 'Member';
+    ctx.fillText(memberType, 512, 450);
     
-    // "INNER CIRCLE" badge
-    ctx.fillStyle = COLORS.primary;
-    ctx.font = 'bold 28px Arial';
-    ctx.fillText('INNER CIRCLE', textX, 175);
+    // Draw concentric circles at bottom
+    drawConcentricCircles(ctx, 512, 670, 50);
     
-    // Member badge line
-    ctx.fillStyle = COLORS.secondary;
-    ctx.font = '18px Arial';
-    const memberType = member.is_founding_member ? '★ FOUNDING MEMBER' : 'MEMBER';
-    ctx.fillText(memberType, textX, 215);
+    // Date (Member since)
+    ctx.fillStyle = COLORS.gray;
+    ctx.font = '18px Arial, sans-serif';
+    const memberSince = formatDate(member.joined_at);
+    ctx.fillText(`Member since ${memberSince}`, 512, 590);
     
-    // Member since
-    ctx.fillStyle = COLORS.textMuted;
-    ctx.font = '18px Arial';
-    const memberSince = formatMemberSince(member.joined_at);
-    ctx.fillText(`Member for ${memberSince}`, textX, 250);
+    // CTA at bottom - in the decorative box area
+    ctx.fillStyle = COLORS.white;
+    ctx.font = '24px Arial, sans-serif';
+    ctx.fillText('Want in? Ask me for an invite!', 512, 730);
     
-    // Invites remaining
-    ctx.fillStyle = COLORS.text;
-    ctx.font = '16px Arial';
-    ctx.fillText(`${member.invites_remaining} invites remaining`, textX, 290);
-    
-    // CTA at bottom
-    ctx.fillStyle = COLORS.textMuted;
-    ctx.font = 'italic 16px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Want in? Ask me for an invite.', WIDTH / 2, HEIGHT - 55);
-    
-    // Small decorative line
-    ctx.strokeStyle = COLORS.primary;
-    ctx.lineWidth = 1;
+    // Small decorative elements
+    ctx.strokeStyle = COLORS.neonGreen;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(WIDTH / 2 - 100, HEIGHT - 75);
-    ctx.lineTo(WIDTH / 2 + 100, HEIGHT - 75);
+    ctx.moveTo(200, 730);
+    ctx.lineTo(270, 730);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(754, 730);
+    ctx.lineTo(824, 730);
     ctx.stroke();
     
     return canvas.toBuffer('image/png');

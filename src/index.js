@@ -215,6 +215,109 @@ bot.help((ctx) => {
     );
 });
 
+// Seed group command (admin only, run in a group)
+bot.command('seedgroup', async (ctx) => {
+    // Must be in a group
+    if (ctx.chat.type === 'private') {
+        await ctx.reply('❌ Run this command in a group chat.');
+        return;
+    }
+    
+    try {
+        // Check if user is admin
+        const chatMember = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+        if (!['creator', 'administrator'].includes(chatMember.status)) {
+            await ctx.reply('❌ Only admins can seed groups.');
+            return;
+        }
+        
+        // Get or create member record for the admin
+        let admin = await db.getMemberByTelegramId(ctx.from.id);
+        if (!admin) {
+            admin = await db.createMember({
+                telegramId: ctx.from.id,
+                username: ctx.from.username,
+                firstName: ctx.from.first_name,
+                lastName: ctx.from.last_name,
+                isFoundingMember: true
+            });
+        }
+        
+        // Mark this group as seeded
+        await db.addSeededGroup(ctx.chat.id, ctx.chat.title, admin.id);
+        
+        // Seed all admins immediately
+        const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id);
+        let seeded = 0;
+        
+        for (const adminMember of admins) {
+            if (adminMember.user.is_bot) continue;
+            
+            try {
+                await db.upsertMember({
+                    telegramId: adminMember.user.id,
+                    username: adminMember.user.username,
+                    firstName: adminMember.user.first_name,
+                    lastName: adminMember.user.last_name,
+                    isFoundingMember: true
+                });
+                seeded++;
+            } catch (e) {
+                console.error('Failed to seed admin:', e.message);
+            }
+        }
+        
+        await ctx.reply(
+            `✅ Group seeded!\n\n` +
+            `• ${seeded} admin(s) added as founding members\n` +
+            `• Regular members will be auto-added when they send a message\n\n` +
+            `Members can now DM the bot to get their card!`
+        );
+        
+    } catch (error) {
+        console.error('Seedgroup error:', error);
+        await ctx.reply('Something went wrong. Please try again.');
+    }
+});
+
+// Auto-seed members when they message in a seeded group
+bot.on('message', async (ctx, next) => {
+    // Skip private chats and bot messages
+    if (ctx.chat.type === 'private' || ctx.from.is_bot) {
+        return next();
+    }
+    
+    try {
+        // Check if this is a seeded group
+        const isSeeded = await db.isSeededGroup(ctx.chat.id);
+        if (!isSeeded) {
+            return next();
+        }
+        
+        // Check if user is already a member
+        const existing = await db.getMemberByTelegramId(ctx.from.id);
+        if (existing) {
+            return next();
+        }
+        
+        // Auto-add them as a founding member
+        await db.upsertMember({
+            telegramId: ctx.from.id,
+            username: ctx.from.username,
+            firstName: ctx.from.first_name,
+            lastName: ctx.from.last_name,
+            isFoundingMember: true
+        });
+        
+        console.log(`Auto-seeded member: ${ctx.from.first_name} (${ctx.from.id})`);
+        
+    } catch (error) {
+        console.error('Auto-seed error:', error.message);
+    }
+    
+    return next();
+});
+
 // Error handling
 bot.catch((err, ctx) => {
     console.error('Bot error:', err);
