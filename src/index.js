@@ -153,7 +153,7 @@ bot.command('card', async (ctx) => {
         if (!member.is_founding_member && member.invited_by) {
             const inviter = await db.getMemberById(member.invited_by);
             if (inviter) {
-                inviterName = inviter.first_name || inviter.username || 'Someone';
+                inviterName = inviter.telegram_name || inviter.telegram_username || inviter.first_name || 'Someone';
             }
         }
         
