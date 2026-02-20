@@ -1,4 +1,4 @@
-const { createCanvas, loadImage } = require('canvas');
+const { createCanvas, loadImage, registerFont } = require('canvas');
 const https = require('https');
 const http = require('http');
 const path = require('path');
@@ -21,6 +21,23 @@ const ASSETS = {
     hexFrame: path.join(__dirname, 'assets', 'hex-frame.png'),
     hexMask: path.join(__dirname, 'assets', 'hex-mask.png')
 };
+
+// Font paths
+const FONTS = {
+    spaceGroteskBold: path.join(__dirname, 'assets', 'fonts', 'SpaceGrotesk-Bold.ttf'),
+    satoshiMedium: path.join(__dirname, 'assets', 'fonts', 'Satoshi-Medium.ttf'),
+    satoshiRegular: path.join(__dirname, 'assets', 'fonts', 'Satoshi-Regular.ttf')
+};
+
+// Register fonts
+try {
+    registerFont(FONTS.spaceGroteskBold, { family: 'Space Grotesk', weight: 'bold' });
+    registerFont(FONTS.satoshiMedium, { family: 'Satoshi', weight: '500' });
+    registerFont(FONTS.satoshiRegular, { family: 'Satoshi', weight: 'normal' });
+    console.log('Fonts registered successfully');
+} catch (e) {
+    console.error('Failed to register fonts:', e.message);
+}
 
 async function downloadImage(url) {
     return new Promise((resolve, reject) => {
@@ -147,7 +164,7 @@ async function generateMemberCard(bot, member) {
         ctx.fill();
         
         ctx.fillStyle = COLORS.pink;
-        ctx.font = 'bold 72px Arial, sans-serif';
+        ctx.font = 'bold 72px "Space Grotesk", Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const initials = (member.first_name?.[0] || '') + (member.last_name?.[0] || '');
@@ -155,25 +172,25 @@ async function generateMemberCard(bot, member) {
         ctx.restore();
     }
     
-    // Name
+    // Name - Space Grotesk Bold
     ctx.fillStyle = COLORS.white;
-    ctx.font = 'bold 48px Arial, sans-serif';
+    ctx.font = 'bold 48px "Space Grotesk", Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const displayName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.username || 'Member';
     ctx.fillText(displayName, WIDTH / 2, 340);
     
-    // Member type (Founding Member / Member)
+    // Member type (Founding Member / Member) - Satoshi Medium
     ctx.fillStyle = COLORS.red;
-    ctx.font = '28px Arial, sans-serif';
+    ctx.font = '500 28px "Satoshi", Arial';
     const memberType = member.is_founding_member ? 'Founding Member' : 'Member';
     ctx.fillText(memberType, WIDTH / 2, 405);
     
-    // Member since date
+    // Member since date - Satoshi Regular
     ctx.fillStyle = COLORS.gray;
-    ctx.font = '22px Arial, sans-serif';
+    ctx.font = 'normal 22px "Satoshi", Arial';
     const memberSince = formatDate(member.joined_at);
-    ctx.fillText(memberSince, WIDTH / 2, 450);
+    ctx.fillText(`Member since ${memberSince}`, WIDTH / 2, 450);
     
     return canvas.toBuffer('image/png');
 }
