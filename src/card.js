@@ -114,10 +114,9 @@ async function generateMemberCard(bot, member, inviterName = null) {
     const ctx = canvas.getContext('2d');
     
     // Load assets
-    let background, hexFrame;
+    let background;
     try {
         background = await loadImage(ASSETS.background);
-        hexFrame = await loadImage(ASSETS.hexFrame);
     } catch (e) {
         console.error('Failed to load assets:', e.message);
     }
@@ -133,21 +132,7 @@ async function generateMemberCard(bot, member, inviterName = null) {
     // Profile photo area - centered
     const photoX = WIDTH / 2;
     const photoY = 200;
-    const hexScale = 1.0;
-    const hexWidth = 255 * hexScale;
-    const hexHeight = 240 * hexScale;
     const hexRadius = 105; // Radius for clipping hexagon
-    
-    // Draw hex frame (with orange shadow)
-    if (hexFrame) {
-        ctx.drawImage(
-            hexFrame,
-            photoX - hexWidth / 2,
-            photoY - hexHeight / 2,
-            hexWidth,
-            hexHeight
-        );
-    }
     
     // Try to load profile photo
     const profilePhoto = await getProfilePhoto(bot, member.telegram_id);
