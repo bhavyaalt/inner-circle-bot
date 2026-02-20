@@ -15,8 +15,12 @@ const COLORS = {
     pink: '#FF9FC2'
 };
 
-// Background image path
-const BACKGROUND_PATH = path.join(__dirname, 'assets', 'card-background.png');
+// Asset paths
+const ASSETS = {
+    background: path.join(__dirname, 'assets', 'card-background.png'),
+    hexFrame: path.join(__dirname, 'assets', 'hex-frame.png'),
+    hexMask: path.join(__dirname, 'assets', 'hex-mask.png')
+};
 
 async function downloadImage(url) {
     return new Promise((resolve, reject) => {
@@ -57,17 +61,42 @@ function formatDate(date) {
     return `${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+// Draw a hexagon path for clipping
+function drawHexagonPath(ctx, cx, cy, radius) {
+    const sides = 6;
+    const angleOffset = Math.PI / 6; // Rotate to have flat top
+    
+    ctx.beginPath();
+    for (let i = 0; i < sides; i++) {
+        const angle = (Math.PI * 2 / sides) * i - Math.PI / 2 + angleOffset;
+        const x = cx + radius * Math.cos(angle);
+        const y = cy + radius * Math.sin(angle);
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    }
+    ctx.closePath();
+}
+
 async function generateMemberCard(bot, member) {
     const canvas = createCanvas(WIDTH, HEIGHT);
     const ctx = canvas.getContext('2d');
     
-    // Load and draw background
+    // Load assets
+    let background, hexFrame;
     try {
-        const background = await loadImage(BACKGROUND_PATH);
-        ctx.drawImage(background, 0, 0, WIDTH, HEIGHT);
+        background = await loadImage(ASSETS.background);
+        hexFrame = await loadImage(ASSETS.hexFrame);
     } catch (e) {
-        console.error('Failed to load background:', e.message);
-        // Fallback to black background
+        console.error('Failed to load assets:', e.message);
+    }
+    
+    // Draw background
+    if (background) {
+        ctx.drawImage(background, 0, 0, WIDTH, HEIGHT);
+    } else {
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
     }
@@ -75,43 +104,55 @@ async function generateMemberCard(bot, member) {
     // Profile photo area - centered
     const photoX = WIDTH / 2;
     const photoY = 200;
-    const photoRadius = 100;
+    const hexScale = 1.0;
+    const hexWidth = 255 * hexScale;
+    const hexHeight = 240 * hexScale;
+    const hexRadius = 105; // Radius for clipping hexagon
     
-    // Profile photo border (pink)
-    ctx.beginPath();
-    ctx.arc(photoX, photoY, photoRadius + 5, 0, Math.PI * 2);
-    ctx.strokeStyle = COLORS.pink;
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    
-    // Profile photo background
-    ctx.beginPath();
-    ctx.arc(photoX, photoY, photoRadius, 0, Math.PI * 2);
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fill();
+    // Draw hex frame (with orange shadow)
+    if (hexFrame) {
+        ctx.drawImage(
+            hexFrame,
+            photoX - hexWidth / 2,
+            photoY - hexHeight / 2,
+            hexWidth,
+            hexHeight
+        );
+    }
     
     // Try to load profile photo
     const profilePhoto = await getProfilePhoto(bot, member.telegram_id);
+    
     if (profilePhoto) {
+        // Clip profile photo to hexagon shape
         ctx.save();
-        ctx.beginPath();
-        ctx.arc(photoX, photoY, photoRadius - 2, 0, Math.PI * 2);
+        drawHexagonPath(ctx, photoX, photoY, hexRadius - 8);
         ctx.clip();
-        ctx.drawImage(profilePhoto, 
-            photoX - photoRadius + 2, 
-            photoY - photoRadius + 2, 
-            (photoRadius - 2) * 2, 
-            (photoRadius - 2) * 2
+        
+        // Draw profile photo centered in hexagon
+        const photoSize = hexRadius * 2;
+        ctx.drawImage(
+            profilePhoto,
+            photoX - photoSize / 2,
+            photoY - photoSize / 2,
+            photoSize,
+            photoSize
         );
         ctx.restore();
     } else {
-        // Placeholder initials
+        // Placeholder initials in hexagon
+        ctx.save();
+        drawHexagonPath(ctx, photoX, photoY, hexRadius - 8);
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fill();
+        
         ctx.fillStyle = COLORS.pink;
         ctx.font = 'bold 72px Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const initials = (member.first_name?.[0] || '') + (member.last_name?.[0] || '');
         ctx.fillText(initials.toUpperCase() || '?', photoX, photoY);
+        ctx.restore();
     }
     
     // Name
@@ -120,19 +161,19 @@ async function generateMemberCard(bot, member) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const displayName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.username || 'Member';
-    ctx.fillText(displayName, WIDTH / 2, 330);
+    ctx.fillText(displayName, WIDTH / 2, 340);
     
     // Member type (Founding Member / Member)
     ctx.fillStyle = COLORS.red;
     ctx.font = '28px Arial, sans-serif';
     const memberType = member.is_founding_member ? 'Founding Member' : 'Member';
-    ctx.fillText(memberType, WIDTH / 2, 395);
+    ctx.fillText(memberType, WIDTH / 2, 405);
     
     // Member since date
     ctx.fillStyle = COLORS.gray;
     ctx.font = '22px Arial, sans-serif';
     const memberSince = formatDate(member.joined_at);
-    ctx.fillText(memberSince, WIDTH / 2, 440);
+    ctx.fillText(memberSince, WIDTH / 2, 450);
     
     return canvas.toBuffer('image/png');
 }
