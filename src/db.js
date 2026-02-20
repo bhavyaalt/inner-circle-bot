@@ -18,13 +18,15 @@ async function getMemberByTelegramId(telegramId) {
 }
 
 async function createMember({ telegramId, username, firstName, lastName, isFoundingMember = false, invitedById = null }) {
+    // Combine first + last name for telegram_name
+    const telegramName = [firstName, lastName].filter(Boolean).join(' ') || null;
+    
     const { data, error } = await supabase
         .from('inner_circle_members')
         .insert({
             telegram_id: telegramId,
-            username,
-            first_name: firstName,
-            last_name: lastName,
+            telegram_username: username,
+            telegram_name: telegramName,
             is_founding_member: isFoundingMember,
             invited_by: invitedById,
             invites_remaining: 2
@@ -177,13 +179,15 @@ async function isSeededGroup(chatId) {
 }
 
 async function upsertMember({ telegramId, username, firstName, lastName, isFoundingMember = false, invitedById = null }) {
+    // Combine first + last name for telegram_name
+    const telegramName = [firstName, lastName].filter(Boolean).join(' ') || null;
+    
     const { data, error } = await supabase
         .from('inner_circle_members')
         .upsert({
             telegram_id: telegramId,
-            username,
-            first_name: firstName,
-            last_name: lastName,
+            telegram_username: username,
+            telegram_name: telegramName,
             is_founding_member: isFoundingMember,
             invited_by: invitedById,
             invites_remaining: 2
