@@ -109,7 +109,7 @@ function drawHexagonPath(ctx, cx, cy, radius) {
     ctx.closePath();
 }
 
-async function generateMemberCard(bot, member) {
+async function generateMemberCard(bot, member, inviterName = null) {
     const canvas = createCanvas(WIDTH, HEIGHT);
     const ctx = canvas.getContext('2d');
     
@@ -192,10 +192,17 @@ async function generateMemberCard(bot, member) {
     const displayName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.username || 'Member';
     ctx.fillText(displayName, WIDTH / 2, 340);
     
-    // Member type (Founding Member / Member) - Satoshi Medium
+    // Member type (Founding Member / Inviter's name) - Satoshi Medium
     ctx.fillStyle = COLORS.red;
     ctx.font = fontsLoaded ? '500 28px Satoshi' : '28px Arial';
-    const memberType = member.is_founding_member ? 'Founding Member' : 'Member';
+    let memberType;
+    if (member.is_founding_member) {
+        memberType = 'Founding Member';
+    } else if (inviterName) {
+        memberType = inviterName;
+    } else {
+        memberType = 'Member';
+    }
     ctx.fillText(memberType, WIDTH / 2, 405);
     
     // Member since date - Satoshi Regular

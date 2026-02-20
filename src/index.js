@@ -148,7 +148,16 @@ bot.command('card', async (ctx) => {
         
         await ctx.reply('🎨 Generating your card...');
         
-        const cardBuffer = await generateMemberCard(bot, member);
+        // Get inviter name if not a founding member
+        let inviterName = null;
+        if (!member.is_founding_member && member.invited_by) {
+            const inviter = await db.getMemberById(member.invited_by);
+            if (inviter) {
+                inviterName = inviter.first_name || inviter.username || 'Someone';
+            }
+        }
+        
+        const cardBuffer = await generateMemberCard(bot, member, inviterName);
         
         await ctx.replyWithPhoto(
             { source: cardBuffer },
