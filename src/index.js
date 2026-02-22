@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const db = require('./db');
-const { generateMemberCard } = require('./card');
+const { generateMemberCard } = require('./card-v2');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
