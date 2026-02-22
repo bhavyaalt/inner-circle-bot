@@ -1,12 +1,13 @@
 const { createCanvas, loadImage, registerFont } = require('canvas');
+const sharp = require('sharp');
 const https = require('https');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
 
-// Card dimensions - landscape like Figma v2
+// Card dimensions from Figma v2
 const WIDTH = 1200;
-const HEIGHT = 630;
+const HEIGHT = 675;
 
 // Random background colors from the Figma design
 const BG_COLORS = [
@@ -17,17 +18,17 @@ const BG_COLORS = [
     '#FF6B35', // Orange
 ];
 
-// Text colors that work with each background
-const TEXT_COLORS = {
-    '#0047FF': { primary: '#FFFFFF', secondary: '#FFFFFF' },
-    '#B24BF3': { primary: '#FFFFFF', secondary: '#FFFFFF' },
-    '#BFFF00': { primary: '#000000', secondary: '#000000' },
-    '#FFB6D9': { primary: '#000000', secondary: '#000000' },
-    '#FF6B35': { primary: '#FFFFFF', secondary: '#FFFFFF' },
-};
-
 // Asset paths
 const ASSETS_DIR = path.join(__dirname, 'assets');
+
+// SVG assets exported from Figma
+const SVG_ASSETS = {
+    leftIO: path.join(ASSETS_DIR, 'left-io.svg'),
+    rightIC: path.join(ASSETS_DIR, 'right-ic.svg'),
+    innerCircleLogo: path.join(ASSETS_DIR, 'inner-circle-logo.svg'),
+    sunIcon: path.join(ASSETS_DIR, 'sun-icon.svg'),
+    bottomInvite: path.join(ASSETS_DIR, 'bottom-invite.svg'),
+};
 
 // Font paths
 const FONTS = {
@@ -54,6 +55,31 @@ try {
     console.error('Failed to register fonts:', e.message);
 }
 
+// Exact positions from Figma (relative to 1200x675 card)
+const POSITIONS = {
+    // INNER CIRCLE logo top-left
+    logo: { x: 36, y: 36, width: 101, height: 46 },
+    
+    // Name + Sun + Member type frame (top-right area)
+    nameFrame: { x: 718, y: 37, width: 446, height: 44 },
+    // Within nameFrame:
+    // - Name: x=0, y=0
+    // - Sun: x=99, y=1.5  (relative to nameFrame)
+    // - Member type: x=154, y=0 (relative to nameFrame)
+    
+    // Left IO letters (partially off-screen)
+    leftIO: { x: -54, y: 145, width: 728, height: 445 },
+    
+    // Right IC letters (partially off-screen)
+    rightIC: { x: 744, y: 145, width: 728, height: 445 },
+    
+    // Profile ellipse (white ring)
+    profile: { x: 266, y: 186, width: 369, height: 369 },
+    
+    // Bottom invite box
+    bottomInvite: { x: 284, y: 555, width: 373, height: 73 },
+};
+
 async function downloadImage(url) {
     return new Promise((resolve, reject) => {
         const protocol = url.startsWith('https') ? https : http;
@@ -78,7 +104,7 @@ async function getProfilePhoto(bot, userId) {
             const file = await bot.telegram.getFile(fileId);
             const url = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`;
             const buffer = await downloadImage(url);
-            return await loadImage(buffer);
+            return buffer;
         }
     } catch (e) {
         console.error('Failed to get profile photo:', e.message);
@@ -86,151 +112,169 @@ async function getProfilePhoto(bot, userId) {
     return null;
 }
 
-// Draw the "INNER CIRCLE" logo (top left) - stylized with circle O
-function drawInnerCircleLogo(ctx, color) {
-    ctx.fillStyle = color;
-    ctx.font = fontsLoaded ? 'bold 28px SpaceGrotesk' : 'bold 28px Arial';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
+// Load SVG and tint it with background-appropriate color
+async function loadSvgTinted(svgPath, bgColor) {
+    const svgContent = fs.readFileSync(svgPath, 'utf8');
     
-    // "INN" then special "E" with line, then "R"
-    ctx.fillText('INNER', 50, 45);
+    // For dark backgrounds, keep white. For light backgrounds (lime, pink), use black
+    const isLightBg = ['#BFFF00', '#FFB6D9'].includes(bgColor);
+    const tintColor = isLightBg ? '#000000' : '#FFFFFF';
     
-    // "CIRCLE" below with the O being a circle with cross
-    ctx.fillText('CIRCLE', 50, 75);
+    // Replace fill="white" with the tint color
+    const tintedSvg = svgContent
+        .replace(/fill="white"/g, `fill="${tintColor}"`)
+        .replace(/stroke="white"/g, `stroke="${tintColor}"`);
+    
+    return Buffer.from(tintedSvg);
 }
 
-// Draw sun/starburst icon
-function drawSunIcon(ctx, x, y, radius, color) {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
+// Create circular profile with white ring and grayscale effect
+async function createProfileComposite(photoBuffer, bgColor) {
+    const p = POSITIONS.profile;
+    const ringWidth = 12;
+    const innerRadius = (p.width / 2) - ringWidth;
     
-    const numRays = 16;
-    const innerRadius = radius * 0.3;
-    const outerRadius = radius;
+    const isLightBg = ['#BFFF00', '#FFB6D9'].includes(bgColor);
+    const ringColor = isLightBg ? '#000000' : '#FFFFFF';
     
-    for (let i = 0; i < numRays; i++) {
-        const angle = (i * 2 * Math.PI) / numRays;
-        const x1 = x + Math.cos(angle) * innerRadius;
-        const y1 = y + Math.sin(angle) * innerRadius;
-        const x2 = x + Math.cos(angle) * outerRadius;
-        const y2 = y + Math.sin(angle) * outerRadius;
-        
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-    }
-}
-
-// Draw the big "IOIC" background geometric shapes
-function drawBackgroundLetters(ctx, color) {
-    ctx.fillStyle = color;
+    // Create the ring as a circle
+    const ringSvg = `
+        <svg width="${p.width}" height="${p.height}" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="${p.width/2}" cy="${p.height/2}" r="${p.width/2 - ringWidth/2}" 
+                    fill="none" stroke="${ringColor}" stroke-width="${ringWidth}"/>
+        </svg>
+    `;
     
-    // Big "I" on far left (partially cut off)
-    ctx.fillRect(-20, 170, 60, 290);  // Vertical bar
-    ctx.fillRect(-20, 170, 120, 60);   // Top serif
-    ctx.fillRect(-20, 400, 120, 60);   // Bottom serif
-    
-    // Big "O" - the main circle where profile sits
-    // This is drawn as a ring (will be behind the profile)
-    const oX = 400;
-    const oY = HEIGHT / 2;
-    const outerR = 200;
-    const innerR = 130;
-    
-    ctx.beginPath();
-    ctx.arc(oX, oY, outerR, 0, Math.PI * 2);
-    ctx.arc(oX, oY, innerR, 0, Math.PI * 2, true); // Counter-clockwise for hole
-    ctx.fill();
-    
-    // Big "I" after the O
-    ctx.fillRect(680, 170, 60, 290);  // Vertical bar
-    ctx.fillRect(640, 170, 140, 60);   // Top serif
-    ctx.fillRect(640, 400, 140, 60);   // Bottom serif
-    
-    // Big "C" on far right (partially cut off)
-    const cX = WIDTH + 50;
-    const cY = HEIGHT / 2;
-    const cOuterR = 220;
-    const cInnerR = 150;
-    
-    ctx.beginPath();
-    ctx.arc(cX, cY, cOuterR, 0.6, Math.PI * 2 - 0.6);
-    ctx.arc(cX, cY, cInnerR, Math.PI * 2 - 0.6, 0.6, true);
-    ctx.closePath();
-    ctx.fill();
-}
-
-// Draw circular profile photo with white ring (B&W effect)
-function drawProfilePhoto(ctx, photo, cx, cy, radius, ringColor) {
-    // White ring
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius + 12, 0, Math.PI * 2);
-    ctx.fillStyle = ringColor;
-    ctx.fill();
-    
-    // Clip to circle and draw photo
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.clip();
-    
-    if (photo) {
-        // Draw photo centered and covering the circle (grayscale via composite)
-        const size = Math.max(photo.width, photo.height);
-        const scale = (radius * 2) / Math.min(photo.width, photo.height);
-        const w = photo.width * scale;
-        const h = photo.height * scale;
-        
-        ctx.drawImage(photo, cx - w/2, cy - h/2, w, h);
-        
-        // Apply grayscale effect
-        ctx.globalCompositeOperation = 'saturation';
-        ctx.fillStyle = '#000';
-        ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
-        ctx.globalCompositeOperation = 'source-over';
-    } else {
-        // Gray placeholder
-        ctx.fillStyle = '#333333';
-        ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+    if (!photoBuffer) {
+        // Just return the ring with gray center
+        const grayCenterSvg = `
+            <svg width="${p.width}" height="${p.height}" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="${p.width/2}" cy="${p.height/2}" r="${innerRadius}" fill="#333333"/>
+                <circle cx="${p.width/2}" cy="${p.height/2}" r="${p.width/2 - ringWidth/2}" 
+                        fill="none" stroke="${ringColor}" stroke-width="${ringWidth}"/>
+            </svg>
+        `;
+        return sharp(Buffer.from(grayCenterSvg)).png().toBuffer();
     }
     
-    ctx.restore();
-}
-
-// Draw placeholder initials
-function drawInitials(ctx, name, cx, cy) {
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = fontsLoaded ? 'bold 80px SpaceGrotesk' : 'bold 80px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-    ctx.fillText(initials || '?', cx, cy);
+    // Process photo: resize, make circular, grayscale
+    const photoSize = Math.floor(innerRadius * 2);
+    const circularPhoto = await sharp(photoBuffer)
+        .resize(photoSize, photoSize, { fit: 'cover' })
+        .grayscale()
+        .composite([{
+            input: Buffer.from(`
+                <svg width="${photoSize}" height="${photoSize}" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="${photoSize/2}" cy="${photoSize/2}" r="${photoSize/2}" fill="white"/>
+                </svg>
+            `),
+            blend: 'dest-in'
+        }])
+        .png()
+        .toBuffer();
+    
+    // Composite ring over photo
+    const ringBuffer = await sharp(Buffer.from(ringSvg)).png().toBuffer();
+    
+    const photoOffset = Math.floor((p.width - photoSize) / 2);
+    
+    return sharp({
+        create: {
+            width: p.width,
+            height: p.height,
+            channels: 4,
+            background: { r: 0, g: 0, b: 0, alpha: 0 }
+        }
+    })
+    .composite([
+        { input: circularPhoto, left: photoOffset, top: photoOffset },
+        { input: ringBuffer, left: 0, top: 0 }
+    ])
+    .png()
+    .toBuffer();
 }
 
 async function generateMemberCard(bot, member, inviterName = null) {
+    // Pick random background color
+    const bgColor = BG_COLORS[Math.floor(Math.random() * BG_COLORS.length)];
+    const isLightBg = ['#BFFF00', '#FFB6D9'].includes(bgColor);
+    const textColor = isLightBg ? '#000000' : '#FFFFFF';
+    
+    // Parse background color to RGB
+    const bgR = parseInt(bgColor.slice(1, 3), 16);
+    const bgG = parseInt(bgColor.slice(3, 5), 16);
+    const bgB = parseInt(bgColor.slice(5, 7), 16);
+    
+    // Create base image with background color
+    const composites = [];
+    
+    // Load and tint SVG assets
+    const [leftIOSvg, rightICSvg, logoSvg, sunSvg] = await Promise.all([
+        loadSvgTinted(SVG_ASSETS.leftIO, bgColor),
+        loadSvgTinted(SVG_ASSETS.rightIC, bgColor),
+        loadSvgTinted(SVG_ASSETS.innerCircleLogo, bgColor),
+        loadSvgTinted(SVG_ASSETS.sunIcon, bgColor),
+    ]);
+    
+    // Add left IO letters
+    const leftIOPng = await sharp(leftIOSvg).png().toBuffer();
+    composites.push({
+        input: leftIOPng,
+        left: POSITIONS.leftIO.x,
+        top: POSITIONS.leftIO.y,
+    });
+    
+    // Add right IC letters
+    const rightICPng = await sharp(rightICSvg).png().toBuffer();
+    composites.push({
+        input: rightICPng,
+        left: POSITIONS.rightIC.x,
+        top: POSITIONS.rightIC.y,
+    });
+    
+    // Add INNER CIRCLE logo
+    const logoPng = await sharp(logoSvg)
+        .resize(POSITIONS.logo.width, POSITIONS.logo.height, { fit: 'contain' })
+        .png()
+        .toBuffer();
+    composites.push({
+        input: logoPng,
+        left: POSITIONS.logo.x,
+        top: POSITIONS.logo.y,
+    });
+    
+    // Get profile photo and create composite
+    const profilePhotoBuffer = await getProfilePhoto(bot, member.telegram_id);
+    const profileComposite = await createProfileComposite(profilePhotoBuffer, bgColor);
+    composites.push({
+        input: profileComposite,
+        left: POSITIONS.profile.x,
+        top: POSITIONS.profile.y,
+    });
+    
+    // Create text overlay using canvas
     const canvas = createCanvas(WIDTH, HEIGHT);
     const ctx = canvas.getContext('2d');
     
-    // Pick random background color
-    const bgColor = BG_COLORS[Math.floor(Math.random() * BG_COLORS.length)];
-    const textColors = TEXT_COLORS[bgColor];
+    // Transparent background
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
     
-    // Fill background
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, WIDTH, HEIGHT);
-    
-    // Draw big "IOIC" background letters in white
-    drawBackgroundLetters(ctx, textColors.primary);
-    
-    // === TOP LEFT: INNER CIRCLE logo ===
-    drawInnerCircleLogo(ctx, textColors.primary);
-    
-    // === TOP RIGHT: Name + Sun + Member Type ===
+    // Name text (top right area)
     const displayName = member.telegram_name || member.telegram_username || member.first_name || member.username || 'Member';
+    ctx.fillStyle = textColor;
+    ctx.font = fontsLoaded ? 'bold 36px SpaceGrotesk' : 'bold 36px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(displayName, POSITIONS.nameFrame.x, POSITIONS.nameFrame.y + 4);
     
-    // Member type text
+    // Measure name width to position sun icon
+    const nameWidth = ctx.measureText(displayName).width;
+    
+    // Sun icon position (after name)
+    const sunX = POSITIONS.nameFrame.x + nameWidth + 14;
+    const sunY = POSITIONS.nameFrame.y + 1;
+    
+    // Member type text (after sun)
     let memberType;
     if (member.is_founding_member) {
         memberType = 'Founding Member';
@@ -240,72 +284,68 @@ async function generateMemberCard(bot, member, inviterName = null) {
         memberType = 'Member';
     }
     
-    // Draw name
-    ctx.fillStyle = textColors.primary;
-    ctx.font = fontsLoaded ? 'bold 52px SpaceGrotesk' : 'bold 52px Arial';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'top';
+    const memberTypeX = sunX + 55;
+    ctx.fillText(memberType, memberTypeX, POSITIONS.nameFrame.y + 4);
     
-    // Calculate positions
-    const nameX = WIDTH - 50;
-    const nameY = 50;
-    
-    // Measure member type text to position sun icon
-    ctx.font = fontsLoaded ? '500 36px Satoshi' : '36px Arial';
-    const memberTypeWidth = ctx.measureText(memberType).width;
-    
-    // Draw name
-    ctx.font = fontsLoaded ? 'bold 52px SpaceGrotesk' : 'bold 52px Arial';
-    const nameWidth = ctx.measureText(displayName).width;
-    
-    // Sun icon position (between name and member type)
-    const sunX = nameX - memberTypeWidth - 30;
-    const sunY = nameY + 26;
-    
-    // Draw: Name [sun] Member Type
-    ctx.fillText(displayName, sunX - 30, nameY);
-    drawSunIcon(ctx, sunX, sunY, 16, textColors.primary);
-    
-    ctx.font = fontsLoaded ? '500 36px Satoshi' : '36px Arial';
-    ctx.fillText(memberType, nameX, nameY + 10);
-    
-    // === CENTER: Profile Photo ===
-    const photoX = 400;
-    const photoY = HEIGHT / 2;
-    const photoRadius = 118;
-    
-    // Try to load profile photo
-    const profilePhoto = await getProfilePhoto(bot, member.telegram_id);
-    
-    // Draw profile with white ring
-    drawProfilePhoto(ctx, profilePhoto, photoX, photoY, photoRadius, textColors.primary);
-    
-    // Draw initials if no photo
-    if (!profilePhoto) {
-        drawInitials(ctx, displayName, photoX, photoY);
-    }
-    
-    // === BOTTOM: Black box with invite text ===
+    // Bottom invite box
+    const bottomY = POSITIONS.bottomInvite.y;
     const boxText = 'Want In? Ask Me For An Invite!';
-    ctx.font = fontsLoaded ? 'bold 28px SpaceGrotesk' : 'bold 28px Arial';
+    ctx.font = fontsLoaded ? 'bold 24px SpaceGrotesk' : 'bold 24px Arial';
     const boxTextWidth = ctx.measureText(boxText).width;
-    const boxPadding = 24;
-    const boxHeight = 50;
+    const boxPadding = 20;
     const boxWidth = boxTextWidth + boxPadding * 2;
+    const boxHeight = 54;
     const boxX = (WIDTH - boxWidth) / 2;
-    const boxY = HEIGHT - 90;
+    
+    // Slight rotation for the box (-3 degrees like Figma)
+    ctx.save();
+    ctx.translate(WIDTH / 2, bottomY + boxHeight / 2);
+    ctx.rotate(-3 * Math.PI / 180);
     
     // Black box
     ctx.fillStyle = '#000000';
-    ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+    ctx.fillRect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight);
     
     // White text
     ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(boxText, WIDTH / 2, boxY + boxHeight / 2);
+    ctx.fillText(boxText, 0, 0);
+    ctx.restore();
     
-    return canvas.toBuffer('image/png');
+    // Convert canvas to PNG buffer
+    const textOverlay = canvas.toBuffer('image/png');
+    composites.push({
+        input: textOverlay,
+        left: 0,
+        top: 0,
+    });
+    
+    // Add sun icon
+    const sunPng = await sharp(sunSvg)
+        .resize(41, 41)
+        .png()
+        .toBuffer();
+    composites.push({
+        input: sunPng,
+        left: Math.round(sunX),
+        top: Math.round(sunY),
+    });
+    
+    // Compose final image
+    const finalImage = await sharp({
+        create: {
+            width: WIDTH,
+            height: HEIGHT,
+            channels: 4,
+            background: { r: bgR, g: bgG, b: bgB, alpha: 255 }
+        }
+    })
+    .composite(composites)
+    .png()
+    .toBuffer();
+    
+    return finalImage;
 }
 
 module.exports = { generateMemberCard };
