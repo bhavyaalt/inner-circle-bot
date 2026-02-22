@@ -21,11 +21,11 @@ const BG_COLORS = [
 // Asset paths
 const ASSETS_DIR = path.join(__dirname, 'assets');
 
-// SVG assets exported from Figma
-const SVG_ASSETS = {
+// Assets exported from Figma
+const ASSETS = {
     leftIO: path.join(ASSETS_DIR, 'left-io.svg'),
     rightIC: path.join(ASSETS_DIR, 'right-ic.svg'),
-    innerCircleLogo: path.join(ASSETS_DIR, 'inner-circle-logo.svg'),
+    innerCircleLogo: path.join(ASSETS_DIR, 'inner-circle-logo.png'), // PNG to avoid border issues
     sunIcon: path.join(ASSETS_DIR, 'sun-icon.svg'),
     bottomInvite: path.join(ASSETS_DIR, 'bottom-invite.svg'),
 };
@@ -208,13 +208,15 @@ async function generateMemberCard(bot, member, inviterName = null) {
     // Create base image with background color
     const composites = [];
     
-    // Load and tint SVG assets
-    const [leftIOSvg, rightICSvg, logoSvg, sunSvg] = await Promise.all([
-        loadSvgTinted(SVG_ASSETS.leftIO, bgColor),
-        loadSvgTinted(SVG_ASSETS.rightIC, bgColor),
-        loadSvgTinted(SVG_ASSETS.innerCircleLogo, bgColor),
-        loadSvgTinted(SVG_ASSETS.sunIcon, bgColor),
+    // Load and tint SVG assets (logo is PNG)
+    const [leftIOSvg, rightICSvg, sunSvg] = await Promise.all([
+        loadSvgTinted(ASSETS.leftIO, bgColor),
+        loadSvgTinted(ASSETS.rightIC, bgColor),
+        loadSvgTinted(ASSETS.sunIcon, bgColor),
     ]);
+    
+    // Load logo PNG separately
+    const logoPngRaw = fs.readFileSync(ASSETS.innerCircleLogo);
     
     // Add left IO letters
     const leftIOPng = await sharp(leftIOSvg)
@@ -238,12 +240,20 @@ async function generateMemberCard(bot, member, inviterName = null) {
         top: POSITIONS.rightIC.y,
     });
     
-    // Add INNER CIRCLE logo (ensure transparent background)
-    const logoPng = await sharp(logoSvg)
-        .ensureAlpha()
+    // Add INNER CIRCLE logo (PNG - tint for light backgrounds)
+    let logoPng = await sharp(logoPngRaw)
         .resize(POSITIONS.logo.width, POSITIONS.logo.height, { fit: 'inside' })
         .png()
         .toBuffer();
+    
+    // Invert colors for light backgrounds (lime, pink)
+    if (isLightBg) {
+        logoPng = await sharp(logoPng)
+            .negate({ alpha: false })
+            .png()
+            .toBuffer();
+    }
+    
     composites.push({
         input: logoPng,
         left: POSITIONS.logo.x,
