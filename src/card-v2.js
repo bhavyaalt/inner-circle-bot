@@ -217,7 +217,10 @@ async function generateMemberCard(bot, member, inviterName = null) {
     ]);
     
     // Add left IO letters
-    const leftIOPng = await sharp(leftIOSvg).png().toBuffer();
+    const leftIOPng = await sharp(leftIOSvg)
+        .ensureAlpha()
+        .png()
+        .toBuffer();
     composites.push({
         input: leftIOPng,
         left: POSITIONS.leftIO.x,
@@ -225,16 +228,20 @@ async function generateMemberCard(bot, member, inviterName = null) {
     });
     
     // Add right IC letters
-    const rightICPng = await sharp(rightICSvg).png().toBuffer();
+    const rightICPng = await sharp(rightICSvg)
+        .ensureAlpha()
+        .png()
+        .toBuffer();
     composites.push({
         input: rightICPng,
         left: POSITIONS.rightIC.x,
         top: POSITIONS.rightIC.y,
     });
     
-    // Add INNER CIRCLE logo
+    // Add INNER CIRCLE logo (ensure transparent background)
     const logoPng = await sharp(logoSvg)
-        .resize(POSITIONS.logo.width, POSITIONS.logo.height, { fit: 'contain' })
+        .ensureAlpha()
+        .resize(POSITIONS.logo.width, POSITIONS.logo.height, { fit: 'inside' })
         .png()
         .toBuffer();
     composites.push({
