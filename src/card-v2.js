@@ -259,22 +259,13 @@ async function generateMemberCard(bot, member, inviterName = null) {
     // Transparent background
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     
-    // Name text (top right area)
+    // Name text (top right area) - RIGHT ALIGNED to stay in bounds
     const displayName = member.telegram_name || member.telegram_username || member.first_name || member.username || 'Member';
     ctx.fillStyle = textColor;
     ctx.font = fontsLoaded ? 'bold 36px SpaceGrotesk' : 'bold 36px Arial';
-    ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(displayName, POSITIONS.nameFrame.x, POSITIONS.nameFrame.y + 4);
     
-    // Measure name width to position sun icon
-    const nameWidth = ctx.measureText(displayName).width;
-    
-    // Sun icon position (after name)
-    const sunX = POSITIONS.nameFrame.x + nameWidth + 14;
-    const sunY = POSITIONS.nameFrame.y + 1;
-    
-    // Member type text (after sun)
+    // Member type text
     let memberType;
     if (member.is_founding_member) {
         memberType = 'Founding Member';
@@ -284,7 +275,24 @@ async function generateMemberCard(bot, member, inviterName = null) {
         memberType = 'Member';
     }
     
-    const memberTypeX = sunX + 55;
+    // Calculate positions from RIGHT edge (with 36px padding)
+    const rightEdge = WIDTH - 36;
+    const memberTypeWidth = ctx.measureText(memberType).width;
+    const nameWidth = ctx.measureText(displayName).width;
+    const sunSize = 41;
+    const gap = 14; // gap between elements
+    
+    // Position from right: [Name] [gap] [Sun] [gap] [MemberType] [padding]
+    const memberTypeX = rightEdge - memberTypeWidth;
+    const sunX = memberTypeX - gap - sunSize;
+    const nameX = sunX - gap - nameWidth;
+    const sunY = POSITIONS.nameFrame.y + 1;
+    
+    // Draw name
+    ctx.textAlign = 'left';
+    ctx.fillText(displayName, nameX, POSITIONS.nameFrame.y + 4);
+    
+    // Draw member type
     ctx.fillText(memberType, memberTypeX, POSITIONS.nameFrame.y + 4);
     
     // Bottom invite box
