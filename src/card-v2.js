@@ -4,7 +4,7 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 
-// Card dimensions - landscape like Figma design
+// Card dimensions - landscape like Figma v2
 const WIDTH = 1200;
 const HEIGHT = 630;
 
@@ -19,11 +19,11 @@ const BG_COLORS = [
 
 // Text colors that work with each background
 const TEXT_COLORS = {
-    '#0047FF': { primary: '#FFFFFF', secondary: '#FFFFFF', accent: '#0047FF', bottomBar: '#FFFFFF' },
-    '#B24BF3': { primary: '#FFFFFF', secondary: '#FFFFFF', accent: '#B24BF3', bottomBar: '#FFFFFF' },
-    '#BFFF00': { primary: '#000000', secondary: '#333333', accent: '#000000', bottomBar: '#000000' },
-    '#FFB6D9': { primary: '#000000', secondary: '#333333', accent: '#000000', bottomBar: '#000000' },
-    '#FF6B35': { primary: '#FFFFFF', secondary: '#FFFFFF', accent: '#FF6B35', bottomBar: '#FFFFFF' },
+    '#0047FF': { primary: '#FFFFFF', secondary: '#FFFFFF' },
+    '#B24BF3': { primary: '#FFFFFF', secondary: '#FFFFFF' },
+    '#BFFF00': { primary: '#000000', secondary: '#000000' },
+    '#FFB6D9': { primary: '#000000', secondary: '#000000' },
+    '#FF6B35': { primary: '#FFFFFF', secondary: '#FFFFFF' },
 };
 
 // Asset paths
@@ -86,209 +86,127 @@ async function getProfilePhoto(bot, userId) {
     return null;
 }
 
-function formatDate(date) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const d = new Date(date);
-    return `${months[d.getMonth()]} ${d.getFullYear()}`;
+// Draw the "INNER CIRCLE" logo (top left) - stylized with circle O
+function drawInnerCircleLogo(ctx, color) {
+    ctx.fillStyle = color;
+    ctx.font = fontsLoaded ? 'bold 28px SpaceGrotesk' : 'bold 28px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    
+    // "INN" then special "E" with line, then "R"
+    ctx.fillText('INNER', 50, 45);
+    
+    // "CIRCLE" below with the O being a circle with cross
+    ctx.fillText('CIRCLE', 50, 75);
 }
 
-// Draw sunburst pattern (radial lines from center, with optional hole)
-function drawSunburst(ctx, cx, cy, radius, color, opacity = 0.08, holeRadius = 0) {
-    ctx.save();
-    ctx.globalAlpha = opacity;
+// Draw sun/starburst icon
+function drawSunIcon(ctx, x, y, radius, color) {
     ctx.strokeStyle = color;
-    ctx.lineWidth = 12;
-    ctx.lineCap = 'round';
+    ctx.lineWidth = 2;
     
-    const numLines = 24;
-    const innerRadius = Math.max(radius * 0.35, holeRadius);
+    const numRays = 16;
+    const innerRadius = radius * 0.3;
     const outerRadius = radius;
     
-    for (let i = 0; i < numLines; i++) {
-        const angle = (i * Math.PI * 2) / numLines;
-        const x1 = cx + Math.cos(angle) * innerRadius;
-        const y1 = cy + Math.sin(angle) * innerRadius;
-        const x2 = cx + Math.cos(angle) * outerRadius;
-        const y2 = cy + Math.sin(angle) * outerRadius;
+    for (let i = 0; i < numRays; i++) {
+        const angle = (i * 2 * Math.PI) / numRays;
+        const x1 = x + Math.cos(angle) * innerRadius;
+        const y1 = y + Math.sin(angle) * innerRadius;
+        const x2 = x + Math.cos(angle) * outerRadius;
+        const y2 = y + Math.sin(angle) * outerRadius;
         
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.stroke();
     }
-    
-    ctx.restore();
 }
 
-// Draw the IO logo (stylized "I" with diagonal slash + "O")
-function drawIOLogo(ctx, x, y, color) {
+// Draw the big "IOIC" background geometric shapes
+function drawBackgroundLetters(ctx, color) {
     ctx.fillStyle = color;
     
-    const height = 42;
-    const stemWidth = 12;
+    // Big "I" on far left (partially cut off)
+    ctx.fillRect(-20, 170, 60, 290);  // Vertical bar
+    ctx.fillRect(-20, 170, 120, 60);   // Top serif
+    ctx.fillRect(-20, 400, 120, 60);   // Bottom serif
     
-    // "I" - Two parts with diagonal cut between them
-    // Top part of I
-    ctx.fillRect(x, y, stemWidth, height * 0.35);
+    // Big "O" - the main circle where profile sits
+    // This is drawn as a ring (will be behind the profile)
+    const oX = 400;
+    const oY = HEIGHT / 2;
+    const outerR = 200;
+    const innerR = 130;
     
-    // Bottom part of I (offset to create slash effect)
-    ctx.fillRect(x + 8, y + height * 0.55, stemWidth, height * 0.45);
-    
-    // Diagonal connector (the slash)
-    ctx.save();
     ctx.beginPath();
-    ctx.moveTo(x + stemWidth, y + height * 0.35);
-    ctx.lineTo(x + stemWidth + 8, y + height * 0.35);
-    ctx.lineTo(x + 8, y + height * 0.55);
-    ctx.lineTo(x, y + height * 0.55);
+    ctx.arc(oX, oY, outerR, 0, Math.PI * 2);
+    ctx.arc(oX, oY, innerR, 0, Math.PI * 2, true); // Counter-clockwise for hole
+    ctx.fill();
+    
+    // Big "I" after the O
+    ctx.fillRect(680, 170, 60, 290);  // Vertical bar
+    ctx.fillRect(640, 170, 140, 60);   // Top serif
+    ctx.fillRect(640, 400, 140, 60);   // Bottom serif
+    
+    // Big "C" on far right (partially cut off)
+    const cX = WIDTH + 50;
+    const cY = HEIGHT / 2;
+    const cOuterR = 220;
+    const cInnerR = 150;
+    
+    ctx.beginPath();
+    ctx.arc(cX, cY, cOuterR, 0.6, Math.PI * 2 - 0.6);
+    ctx.arc(cX, cY, cInnerR, Math.PI * 2 - 0.6, 0.6, true);
     ctx.closePath();
     ctx.fill();
-    ctx.restore();
-    
-    // "O" circle (outline)
+}
+
+// Draw circular profile photo with white ring (B&W effect)
+function drawProfilePhoto(ctx, photo, cx, cy, radius, ringColor) {
+    // White ring
     ctx.beginPath();
-    ctx.arc(x + 50, y + height/2, 17, 0, Math.PI * 2);
-    ctx.lineWidth = 7;
-    ctx.strokeStyle = color;
-    ctx.stroke();
-}
-
-// Draw decorative diagonal brush strokes (right side)
-function drawBrushStrokes(ctx, color, opacity = 0.12) {
+    ctx.arc(cx, cy, radius + 12, 0, Math.PI * 2);
+    ctx.fillStyle = ringColor;
+    ctx.fill();
+    
+    // Clip to circle and draw photo
     ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 14;
-    ctx.lineCap = 'round';
-    
-    // Diagonal lines on right side
-    const strokes = [
-        { x1: WIDTH - 200, y1: 80, x2: WIDTH - 100, y2: 200 },
-        { x1: WIDTH - 170, y1: 110, x2: WIDTH - 70, y2: 230 },
-        { x1: WIDTH - 140, y1: 140, x2: WIDTH - 40, y2: 260 },
-        { x1: WIDTH - 110, y1: 170, x2: WIDTH - 10, y2: 290 },
-        // Lower right strokes
-        { x1: WIDTH - 180, y1: 280, x2: WIDTH - 60, y2: 420 },
-        { x1: WIDTH - 150, y1: 310, x2: WIDTH - 30, y2: 450 },
-        { x1: WIDTH - 120, y1: 340, x2: WIDTH - 0, y2: 480 },
-    ];
-    
-    strokes.forEach(s => {
-        ctx.beginPath();
-        ctx.moveTo(s.x1, s.y1);
-        ctx.lineTo(s.x2, s.y2);
-        ctx.stroke();
-    });
-    
-    ctx.restore();
-}
-
-// Draw INNER/CIRCLE stacked text (top right)
-function drawInnerCircleText(ctx, x, y, color) {
-    ctx.fillStyle = color;
-    ctx.font = fontsLoaded ? 'bold 18px SpaceGrotesk' : 'bold 18px Arial';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'top';
-    
-    // Letter spacing effect
-    const innerText = 'I N N E R';
-    const circleText = 'C I R C L E';
-    
-    ctx.fillText(innerText, x, y);
-    ctx.fillText(circleText, x, y + 22);
-}
-
-// Draw circular profile photo with white ring
-function drawProfilePhoto(ctx, photo, cx, cy, radius, bgColor) {
-    // Determine if dark background for placeholder color
-    const isDark = ['#0047FF', '#B24BF3', '#FF6B35'].includes(bgColor);
-    
-    const ringWidth = 14; // White ring thickness
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.clip();
     
     if (photo) {
-        // Clip to circle and draw photo first
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.clip();
+        // Draw photo centered and covering the circle (grayscale via composite)
+        const size = Math.max(photo.width, photo.height);
+        const scale = (radius * 2) / Math.min(photo.width, photo.height);
+        const w = photo.width * scale;
+        const h = photo.height * scale;
         
-        // Draw photo centered and covering the circle
-        const size = radius * 2;
-        ctx.drawImage(photo, cx - radius, cy - radius, size, size);
+        ctx.drawImage(photo, cx - w/2, cy - h/2, w, h);
         
-        ctx.restore();
+        // Apply grayscale effect
+        ctx.globalCompositeOperation = 'saturation';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+        ctx.globalCompositeOperation = 'source-over';
     } else {
-        // Placeholder circle (no photo) - draw a filled circle
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.fillStyle = isDark ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.2)';
-        ctx.fill();
+        // Gray placeholder
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
     }
     
-    // Draw white ring AFTER photo/placeholder (so it's on top)
-    // DEBUG: Using red to verify ring position
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius + ringWidth / 2, 0, Math.PI * 2);
-    ctx.strokeStyle = '#FF0000'; // DEBUG: Red to verify
-    ctx.lineWidth = ringWidth;
-    ctx.stroke();
+    ctx.restore();
 }
 
 // Draw placeholder initials
-function drawInitials(ctx, name, cx, cy, bgColor) {
-    // Use accent color or white for initials
-    const isDark = ['#0047FF', '#B24BF3', '#FF6B35'].includes(bgColor);
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)';
+function drawInitials(ctx, name, cx, cy) {
+    ctx.fillStyle = '#FFFFFF';
     ctx.font = fontsLoaded ? 'bold 80px SpaceGrotesk' : 'bold 80px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
     ctx.fillText(initials || '?', cx, cy);
-}
-
-// Draw bottom bar with diagonal divider
-function drawBottomBar(ctx, bgColor, textColors, memberSince) {
-    const barHeight = 70;
-    const barY = HEIGHT - barHeight;
-    const diagonalOffset = 80; // How much the diagonal cuts in
-    
-    // Blue section (left side with diagonal)
-    ctx.fillStyle = bgColor;
-    ctx.beginPath();
-    ctx.moveTo(0, barY);
-    ctx.lineTo(WIDTH * 0.5 + diagonalOffset, barY);
-    ctx.lineTo(WIDTH * 0.5 - diagonalOffset, HEIGHT);
-    ctx.lineTo(0, HEIGHT);
-    ctx.closePath();
-    ctx.fill();
-    
-    // White section (right side)
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.moveTo(WIDTH * 0.5 + diagonalOffset, barY);
-    ctx.lineTo(WIDTH, barY);
-    ctx.lineTo(WIDTH, HEIGHT);
-    ctx.lineTo(WIDTH * 0.5 - diagonalOffset, HEIGHT);
-    ctx.closePath();
-    ctx.fill();
-    
-    // Sunburst icon (small) + "Member Since" text (left)
-    const sunburstX = 55;
-    const sunburstY = barY + barHeight / 2;
-    drawSunburst(ctx, sunburstX, sunburstY, 18, textColors.bottomBar, 1);
-    
-    ctx.fillStyle = textColors.bottomBar;
-    ctx.font = fontsLoaded ? '500 22px Satoshi' : '22px Arial';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`Member Since ${memberSince}`, 90, barY + barHeight / 2);
-    
-    // "Want In? Ask Me For An Invite!" text (right)
-    ctx.fillStyle = textColors.accent;
-    ctx.font = fontsLoaded ? '500 22px Satoshi' : '22px Arial';
-    ctx.textAlign = 'right';
-    ctx.fillText('Want In? Ask Me For An Invite!', WIDTH - 45, barY + barHeight / 2);
 }
 
 async function generateMemberCard(bot, member, inviterName = null) {
@@ -299,68 +217,20 @@ async function generateMemberCard(bot, member, inviterName = null) {
     const bgColor = BG_COLORS[Math.floor(Math.random() * BG_COLORS.length)];
     const textColors = TEXT_COLORS[bgColor];
     
-    // Determine if dark background
-    const isDark = ['#0047FF', '#B24BF3', '#FF6B35'].includes(bgColor);
-    const decorColor = isDark ? '#FFFFFF' : '#000000';
-    
     // Fill background
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
     
-    // Draw sunburst behind profile area (with hole for profile)
-    const profileX = 260;
-    const profileY = HEIGHT / 2 - 20;
-    const photoRadius = 140;
-    const profileRingWidth = 14;
-    drawSunburst(ctx, profileX, profileY, 320, decorColor, isDark ? 0.08 : 0.06, photoRadius + profileRingWidth + 20);
+    // Draw big "IOIC" background letters in white
+    drawBackgroundLetters(ctx, textColors.primary);
     
-    // Draw decorative brush strokes (right side)
-    drawBrushStrokes(ctx, decorColor, isDark ? 0.12 : 0.08);
+    // === TOP LEFT: INNER CIRCLE logo ===
+    drawInnerCircleLogo(ctx, textColors.primary);
     
-    // === TOP BAR ===
-    // IO logo (top left)
-    drawIOLogo(ctx, 35, 30, textColors.primary);
-    
-    // "INNER CIRCLE" stacked text (top right)
-    drawInnerCircleText(ctx, WIDTH - 35, 30, textColors.primary);
-    
-    // === PROFILE SECTION ===
-    
-    // Try to load profile photo
-    const profilePhoto = await getProfilePhoto(bot, member.telegram_id);
-    
-    // Draw profile with white ring
-    drawProfilePhoto(ctx, profilePhoto, profileX, profileY, photoRadius, bgColor);
-    
-    // Draw initials if no photo
-    if (!profilePhoto) {
-        const displayNameForInitials = member.telegram_name || member.telegram_username || member.first_name || 'Member';
-        drawInitials(ctx, displayNameForInitials, profileX, profileY, bgColor);
-    }
-    
-    // === NAME & TITLE (right of profile) ===
-    const textX = 480;
-    
-    // Name (large)
-    ctx.fillStyle = textColors.primary;
-    ctx.font = fontsLoaded ? 'bold 72px SpaceGrotesk' : 'bold 72px Arial';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
+    // === TOP RIGHT: Name + Sun + Member Type ===
     const displayName = member.telegram_name || member.telegram_username || member.first_name || member.username || 'Member';
     
-    // Truncate name if too long
-    let nameToDisplay = displayName;
-    const maxWidth = WIDTH - textX - 250;
-    while (ctx.measureText(nameToDisplay).width > maxWidth && nameToDisplay.length > 1) {
-        nameToDisplay = nameToDisplay.slice(0, -1);
-    }
-    if (nameToDisplay !== displayName) nameToDisplay += '...';
-    
-    ctx.fillText(nameToDisplay, textX, HEIGHT / 2 - 40);
-    
-    // Member type / Invited by
-    ctx.fillStyle = textColors.primary;
-    ctx.font = fontsLoaded ? '500 28px Satoshi' : '28px Arial';
+    // Member type text
     let memberType;
     if (member.is_founding_member) {
         memberType = 'Founding Member';
@@ -369,11 +239,71 @@ async function generateMemberCard(bot, member, inviterName = null) {
     } else {
         memberType = 'Member';
     }
-    ctx.fillText(memberType, textX, HEIGHT / 2 + 25);
     
-    // === BOTTOM BAR ===
-    const memberSince = formatDate(member.joined_at);
-    drawBottomBar(ctx, bgColor, textColors, memberSince);
+    // Draw name
+    ctx.fillStyle = textColors.primary;
+    ctx.font = fontsLoaded ? 'bold 52px SpaceGrotesk' : 'bold 52px Arial';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    
+    // Calculate positions
+    const nameX = WIDTH - 50;
+    const nameY = 50;
+    
+    // Measure member type text to position sun icon
+    ctx.font = fontsLoaded ? '500 36px Satoshi' : '36px Arial';
+    const memberTypeWidth = ctx.measureText(memberType).width;
+    
+    // Draw name
+    ctx.font = fontsLoaded ? 'bold 52px SpaceGrotesk' : 'bold 52px Arial';
+    const nameWidth = ctx.measureText(displayName).width;
+    
+    // Sun icon position (between name and member type)
+    const sunX = nameX - memberTypeWidth - 30;
+    const sunY = nameY + 26;
+    
+    // Draw: Name [sun] Member Type
+    ctx.fillText(displayName, sunX - 30, nameY);
+    drawSunIcon(ctx, sunX, sunY, 16, textColors.primary);
+    
+    ctx.font = fontsLoaded ? '500 36px Satoshi' : '36px Arial';
+    ctx.fillText(memberType, nameX, nameY + 10);
+    
+    // === CENTER: Profile Photo ===
+    const photoX = 400;
+    const photoY = HEIGHT / 2;
+    const photoRadius = 118;
+    
+    // Try to load profile photo
+    const profilePhoto = await getProfilePhoto(bot, member.telegram_id);
+    
+    // Draw profile with white ring
+    drawProfilePhoto(ctx, profilePhoto, photoX, photoY, photoRadius, textColors.primary);
+    
+    // Draw initials if no photo
+    if (!profilePhoto) {
+        drawInitials(ctx, displayName, photoX, photoY);
+    }
+    
+    // === BOTTOM: Black box with invite text ===
+    const boxText = 'Want In? Ask Me For An Invite!';
+    ctx.font = fontsLoaded ? 'bold 28px SpaceGrotesk' : 'bold 28px Arial';
+    const boxTextWidth = ctx.measureText(boxText).width;
+    const boxPadding = 24;
+    const boxHeight = 50;
+    const boxWidth = boxTextWidth + boxPadding * 2;
+    const boxX = (WIDTH - boxWidth) / 2;
+    const boxY = HEIGHT - 90;
+    
+    // Black box
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+    
+    // White text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(boxText, WIDTH / 2, boxY + boxHeight / 2);
     
     return canvas.toBuffer('image/png');
 }
