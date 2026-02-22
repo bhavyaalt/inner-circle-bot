@@ -260,9 +260,8 @@ async function generateMemberCard(bot, member, inviterName = null) {
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     
     // Name text (top right area) - RIGHT ALIGNED to stay in bounds
-    const displayName = member.telegram_name || member.telegram_username || member.first_name || member.username || 'Member';
+    let displayName = member.telegram_name || member.telegram_username || member.first_name || member.username || 'Member';
     ctx.fillStyle = textColor;
-    ctx.font = fontsLoaded ? 'bold 36px SpaceGrotesk' : 'bold 36px Arial';
     ctx.textBaseline = 'top';
     
     // Member type text
@@ -277,16 +276,38 @@ async function generateMemberCard(bot, member, inviterName = null) {
     
     // Calculate positions from RIGHT edge (with 36px padding)
     const rightEdge = WIDTH - 36;
-    const memberTypeWidth = ctx.measureText(memberType).width;
-    const nameWidth = ctx.measureText(displayName).width;
+    const leftLimit = 200; // Don't go past the logo area
     const sunSize = 41;
-    const gap = 14; // gap between elements
+    const gap = 14;
     
-    // Position from right: [Name] [gap] [Sun] [gap] [MemberType] [padding]
-    const memberTypeX = rightEdge - memberTypeWidth;
-    const sunX = memberTypeX - gap - sunSize;
-    const nameX = sunX - gap - nameWidth;
-    const sunY = POSITIONS.nameFrame.y + 1;
+    // Try font size 36, reduce if needed
+    let fontSize = 36;
+    let nameX, sunX, memberTypeX, nameWidth, memberTypeWidth;
+    
+    while (fontSize >= 24) {
+        ctx.font = fontsLoaded ? `bold ${fontSize}px SpaceGrotesk` : `bold ${fontSize}px Arial`;
+        memberTypeWidth = ctx.measureText(memberType).width;
+        nameWidth = ctx.measureText(displayName).width;
+        
+        memberTypeX = rightEdge - memberTypeWidth;
+        sunX = memberTypeX - gap - sunSize;
+        nameX = sunX - gap - nameWidth;
+        
+        if (nameX >= leftLimit) break;
+        fontSize -= 2;
+    }
+    
+    // If still too wide, truncate name
+    if (nameX < leftLimit) {
+        while (displayName.length > 5 && nameX < leftLimit) {
+            displayName = displayName.slice(0, -1);
+            nameWidth = ctx.measureText(displayName + '...').width;
+            nameX = sunX - gap - nameWidth;
+        }
+        displayName = displayName + '...';
+    }
+    
+    const sunY = POSITIONS.nameFrame.y + Math.round((44 - sunSize) / 2);
     
     // Draw name
     ctx.textAlign = 'left';
