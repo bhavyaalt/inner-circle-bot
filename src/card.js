@@ -164,7 +164,7 @@ async function generateMemberCard(bot, member, inviterName = null) {
         ctx.font = fontsLoaded ? 'bold 72px SpaceGrotesk' : 'bold 72px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        const name = member.telegram_name || member.telegram_username || member.first_name || '';
+        const name = member.first_name || member.username || '';
         const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2);
         ctx.fillText(initials.toUpperCase() || '?', photoX, photoY);
         ctx.restore();
@@ -175,7 +175,7 @@ async function generateMemberCard(bot, member, inviterName = null) {
     ctx.font = fontsLoaded ? 'bold 48px SpaceGrotesk' : 'bold 48px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    const displayName = member.telegram_name || member.telegram_username || member.first_name || member.username || 'Member';
+    const displayName = member.first_name || member.username || 'Member';
     ctx.fillText(displayName, WIDTH / 2, 340);
     
     // Member type (Founding Member / Inviter's name) - Satoshi Medium

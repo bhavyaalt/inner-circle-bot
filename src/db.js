@@ -68,22 +68,15 @@ async function decrementInvites(memberId) {
 }
 
 // Invite functions
-async function createInvite(createdById, targetUsername = null) {
+async function createInvite(createdById) {
     const code = generateInviteCode();
-    
-    const insertData = {
-        code,
-        created_by: createdById
-    };
-    
-    // Only include target_username if provided (column may not exist in older schemas)
-    if (targetUsername) {
-        insertData.target_username = targetUsername;
-    }
     
     const { data, error } = await supabase
         .from('inner_circle_invites')
-        .insert(insertData)
+        .insert({
+            code,
+            created_by: createdById
+        })
         .select()
         .single();
     

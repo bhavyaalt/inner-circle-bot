@@ -277,7 +277,7 @@ async function generateMemberCard(bot, member, inviterName = null) {
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     
     // Name text (top right area) - RIGHT ALIGNED to stay in bounds
-    let displayName = member.telegram_name || member.telegram_username || member.first_name || member.username || 'Member';
+    let displayName = member.first_name || member.username || 'Member';
     ctx.fillStyle = textColor;
     ctx.textBaseline = 'top';
     

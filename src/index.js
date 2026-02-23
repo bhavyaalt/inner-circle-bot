@@ -106,7 +106,7 @@ bot.command('invite', async (ctx) => {
         const targetUsername = args[0]?.replace('@', '') || null;
         
         // Create invite
-        const invite = await db.createInvite(member.id, targetUsername);
+        const invite = await db.createInvite(member.id);
         await db.decrementInvites(member.id);
         
         const botUsername = ctx.botInfo.username;
@@ -153,7 +153,7 @@ bot.command('card', async (ctx) => {
         if (!member.is_founding_member && member.invited_by) {
             const inviter = await db.getMemberById(member.invited_by);
             if (inviter) {
-                inviterName = inviter.telegram_name || inviter.telegram_username || inviter.first_name || 'Someone';
+                inviterName = inviter.first_name || inviter.username || 'Someone';
             }
         }
         
