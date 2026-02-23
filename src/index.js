@@ -15,13 +15,13 @@ bot.start(async (ctx) => {
         let member = await db.getMemberByTelegramId(telegramId);
         
         if (member) {
-            await ctx.reply(
-                `Welcome back to the Inner Circle, ${ctx.from.first_name}! 🎖️\n\n` +
-                `You have ${member.invites_remaining} invite(s) remaining.\n\n` +
-                `Commands:\n` +
-                `/card - Get your member card\n` +
-                `/invite - Create an invite link\n` +
-                `/status - Check your status`
+            await ctx.replyWithMarkdown(
+                `Welcome to the Inner Circle, ${ctx.from.first_name}!\n\n` +
+                `You have ${member.invites_remaining} unique invite codes to bring in folks to the Inner Circle.\n\n` +
+                `Send the bot:\n` +
+                `[/card](tg://bot_command?command=card) - To get your unique founding member card!\n` +
+                `[/invite](tg://bot_command?command=invite) - To create the invite link\n` +
+                `[/status](tg://bot_command?command=status) - To check status of the invite.`
             );
             return;
         }
