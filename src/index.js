@@ -61,7 +61,7 @@ bot.start(async (ctx) => {
             
             await ctx.reply(
                 `🎉 Welcome to the Inner Circle, ${ctx.from.first_name}!\n\n` +
-                `You were invited by ${inviter.first_name || inviter.username}.\n\n` +
+                `You were invited by ${inviter.telegram_name || inviter.telegram_username}.\n\n` +
                 `You now have ${member.invites_remaining} invites to share.\n\n` +
                 `Commands:\n` +
                 `/card - Get your member card\n` +
@@ -159,7 +159,7 @@ bot.command('card', async (ctx) => {
         if (!member.is_founding_member && member.invited_by) {
             const inviter = await db.getMemberById(member.invited_by);
             if (inviter) {
-                inviterName = inviter.first_name || inviter.username || 'Someone';
+                inviterName = inviter.telegram_name || inviter.telegram_username || 'Someone';
             }
         }
         
