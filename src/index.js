@@ -7,8 +7,22 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // Start command - entry point
 bot.start(async (ctx) => {
-    const startPayload = ctx.startPayload; // Invite code if coming from invite link
+    const startPayload = ctx.startPayload; // Invite code or command redirect
     const telegramId = ctx.from.id;
+    
+    // Handle command redirects from group (card/invite/status buttons)
+    if (startPayload === 'card') {
+        await ctx.reply('Use /card to get your member card!');
+        return;
+    }
+    if (startPayload === 'invite') {
+        await ctx.reply('Use /invite to create an invite link!');
+        return;
+    }
+    if (startPayload === 'status') {
+        await ctx.reply('Use /status to check your status!');
+        return;
+    }
     
     try {
         // Check if already a member
@@ -89,10 +103,24 @@ const INNER_CIRCLE_GROUP_ID = -1001613656434;
 
 // Generate invite
 bot.command('invite', async (ctx) => {
+    // Only work in DMs
+    if (ctx.chat.type !== 'private') {
+        await ctx.reply('👉 DM me to create invite links!', {
+            reply_markup: {
+                inline_keyboard: [[
+                    { text: 'Create Invite', url: `https://t.me/${ctx.botInfo.username}?start=invite` }
+                ]]
+            }
+        });
+        return;
+    }
+    
     const telegramId = ctx.from.id;
+    console.log(`[INVITE] Request from ${ctx.from.first_name} (${telegramId})`);
     
     try {
         const member = await db.getMemberByTelegramId(telegramId);
+        console.log(`[INVITE] Member lookup result:`, member ? `found (${member.id})` : 'NOT FOUND');
         
         if (!member) {
             await ctx.reply('❌ You need to be a member to create invites.');
@@ -143,10 +171,24 @@ bot.command('invite', async (ctx) => {
 
 // Generate member card (once per member)
 bot.command('card', async (ctx) => {
+    // Only work in DMs
+    if (ctx.chat.type !== 'private') {
+        await ctx.reply('👉 DM me to get your card!', {
+            reply_markup: {
+                inline_keyboard: [[
+                    { text: 'Get My Card', url: `https://t.me/${ctx.botInfo.username}?start=card` }
+                ]]
+            }
+        });
+        return;
+    }
+    
     const telegramId = ctx.from.id;
+    console.log(`[CARD] Request from ${ctx.from.first_name} (${telegramId})`);
     
     try {
         const member = await db.getMemberByTelegramId(telegramId);
+        console.log(`[CARD] Member lookup result:`, member ? `found (${member.id})` : 'NOT FOUND');
         
         if (!member) {
             await ctx.reply('❌ You need to be a member to get a card.');
@@ -200,6 +242,18 @@ Now, call us Inner Circle.`;
 
 // Check status
 bot.command('status', async (ctx) => {
+    // Only work in DMs
+    if (ctx.chat.type !== 'private') {
+        await ctx.reply('👉 DM me to check your status!', {
+            reply_markup: {
+                inline_keyboard: [[
+                    { text: 'Check Status', url: `https://t.me/${ctx.botInfo.username}?start=status` }
+                ]]
+            }
+        });
+        return;
+    }
+    
     const telegramId = ctx.from.id;
     
     try {
