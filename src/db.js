@@ -208,6 +208,15 @@ async function upsertMember({ telegramId, username, firstName, lastName, isFound
     return data;
 }
 
+async function markCardGenerated(memberId) {
+    const { error } = await supabase
+        .from('inner_circle_members')
+        .update({ card_generated: true })
+        .eq('id', memberId);
+    
+    if (error) throw error;
+}
+
 module.exports = {
     supabase,
     getMemberByTelegramId,
@@ -221,5 +230,6 @@ module.exports = {
     getMemberStats,
     addSeededGroup,
     isSeededGroup,
-    upsertMember
+    upsertMember,
+    markCardGenerated
 };

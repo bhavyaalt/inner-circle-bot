@@ -134,7 +134,7 @@ bot.command('invite', async (ctx) => {
     }
 });
 
-// Generate member card
+// Generate member card (once per member)
 bot.command('card', async (ctx) => {
     const telegramId = ctx.from.id;
     
@@ -143,6 +143,12 @@ bot.command('card', async (ctx) => {
         
         if (!member) {
             await ctx.reply('❌ You need to be a member to get a card.');
+            return;
+        }
+        
+        // Check if card already generated
+        if (member.card_generated) {
+            await ctx.reply('❌ You have already generated your card. Each member can only generate their card once.');
             return;
         }
         
@@ -158,6 +164,9 @@ bot.command('card', async (ctx) => {
         }
         
         const cardBuffer = await generateMemberCard(bot, member, inviterName);
+        
+        // Mark card as generated
+        await db.markCardGenerated(member.id);
         
         await ctx.replyWithPhoto(
             { source: cardBuffer },
