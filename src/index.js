@@ -145,7 +145,7 @@ bot.command('card', async (ctx) => {
         
         // Check if card already generated
         if (member.card_generated) {
-            await ctx.reply('❌ You have already generated your card. Each member can only generate their card once.');
+            await ctx.reply('We know you have your founding member card already, stop procrastinating and share it on socials. We are waiting to like that post. 👀');
             return;
         }
         
