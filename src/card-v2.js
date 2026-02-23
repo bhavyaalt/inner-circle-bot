@@ -152,15 +152,36 @@ async function createProfileComposite(photoBuffer, bgColor) {
     `;
     
     if (!photoBuffer) {
-        // Just return the ring with gray center
-        const grayCenterSvg = `
-            <svg width="${p.width}" height="${p.height}" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="${p.width/2}" cy="${p.height/2}" r="${innerRadius}" fill="#333333"/>
-                <circle cx="${p.width/2}" cy="${p.height/2}" r="${p.width/2 - ringWidth/2}" 
-                        fill="none" stroke="${ringColor}" stroke-width="${ringWidth}"/>
-            </svg>
-        `;
-        return sharp(Buffer.from(grayCenterSvg)).png().toBuffer();
+        // Use default avatar SVG
+        const defaultAvatarPath = path.join(__dirname, 'assets', 'default-avatar.svg');
+        const defaultAvatarSvg = fs.readFileSync(defaultAvatarPath, 'utf8');
+        
+        // Tint the avatar based on background
+        const tintedAvatar = defaultAvatarSvg
+            .replace(/fill="black"/g, `fill="${ringColor}"`);
+        
+        const avatarSize = Math.floor(innerRadius * 2);
+        const avatarBuffer = await sharp(Buffer.from(tintedAvatar))
+            .resize(avatarSize, avatarSize, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+            .png()
+            .toBuffer();
+        
+        // Create composite with ring
+        const avatarOffset = Math.floor((p.width - avatarSize) / 2);
+        return sharp({
+            create: {
+                width: p.width,
+                height: p.height,
+                channels: 4,
+                background: { r: 0, g: 0, b: 0, alpha: 0 }
+            }
+        })
+        .composite([
+            { input: avatarBuffer, left: avatarOffset, top: avatarOffset },
+            { input: Buffer.from(ringSvg), left: 0, top: 0 }
+        ])
+        .png()
+        .toBuffer();
     }
     
     // Process photo: resize, make circular, grayscale
