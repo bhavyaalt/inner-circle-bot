@@ -142,8 +142,8 @@ bot.command('invite', async (ctx) => {
             name: `Invite by ${inviterName}` // For tracking in Telegram admin panel
         });
         
-        // Track in our DB
-        await db.createInvite(member.id);
+        // Track in our DB - store the actual invite link for matching when someone joins
+        await db.createInvite(member.id, inviteLink.invite_link);
         await db.decrementInvites(member.id);
         
         const remainingInvites = member.invites_remaining - 1;
@@ -371,6 +371,62 @@ bot.command('seedgroup', async (ctx) => {
     }
 });
 
+// Track when someone joins via an invite link
+bot.on('chat_member', async (ctx) => {
+    try {
+        const update = ctx.chatMember;
+        
+        // Only care about new members joining
+        if (update.new_chat_member.status !== 'member') return;
+        if (update.old_chat_member.status === 'member') return; // Already was a member
+        
+        const newUser = update.new_chat_member.user;
+        const inviteLink = update.invite_link;
+        
+        // Check if they joined via an invite link we created
+        if (inviteLink && inviteLink.invite_link) {
+            console.log(`[JOIN] ${newUser.first_name} (${newUser.id}) joined via invite: ${inviteLink.invite_link}`);
+            
+            // Find the invite in our DB
+            const invite = await db.getInviteByLink(inviteLink.invite_link);
+            
+            if (invite) {
+                console.log(`[JOIN] Found matching invite from member ${invite.created_by}`);
+                
+                // Get or create the new member
+                let member = await db.getMemberByTelegramId(newUser.id);
+                
+                if (!member) {
+                    // Create new member as invited (not founding)
+                    member = await db.createMember({
+                        telegramId: newUser.id,
+                        username: newUser.username,
+                        firstName: newUser.first_name,
+                        lastName: newUser.last_name,
+                        isFoundingMember: false,
+                        invitedById: invite.created_by
+                    });
+                    console.log(`[JOIN] Created new member ${member.id} invited by ${invite.created_by}`);
+                } else {
+                    // Update existing member's invited_by
+                    await db.updateMemberInvitedBy(member.id, invite.created_by);
+                    console.log(`[JOIN] Updated member ${member.id} invited by ${invite.created_by}`);
+                }
+                
+                // Mark invite as used
+                await db.markInviteUsed(invite.id, member.id);
+                console.log(`[JOIN] Marked invite ${invite.id} as used`);
+            } else {
+                console.log(`[JOIN] No matching invite found in DB for link`);
+            }
+        } else {
+            console.log(`[JOIN] ${newUser.first_name} (${newUser.id}) joined (no invite link tracked)`);
+        }
+    } catch (error) {
+        console.error('[JOIN] Error tracking invite:', error.message);
+    }
+});
+
 // Auto-seed members when they message in a seeded group
 bot.on('message', async (ctx, next) => {
     // Skip private chats and bot messages
@@ -414,8 +470,10 @@ bot.catch((err, ctx) => {
     console.error('Bot error:', err);
 });
 
-// Start bot
-bot.launch().then(() => {
+// Start bot with chat_member updates enabled
+bot.launch({
+    allowedUpdates: ['message', 'callback_query', 'chat_member']
+}).then(() => {
     console.log('🚀 Inner Circle Bot is running!');
 });
 

@@ -69,8 +69,8 @@ async function decrementInvites(memberId) {
 }
 
 // Invite functions
-async function createInvite(createdById) {
-    const code = generateInviteCode();
+async function createInvite(createdById, inviteLink = null) {
+    const code = inviteLink || generateInviteCode(); // Store Telegram invite link or generate code
     
     // Calculate expiry (7 days from now)
     const expiresAt = new Date();
@@ -87,6 +87,18 @@ async function createInvite(createdById) {
         .single();
     
     if (error) throw error;
+    return data;
+}
+
+async function getInviteByLink(inviteLink) {
+    const { data, error } = await supabase
+        .from('inner_circle_invites')
+        .select('*')
+        .eq('code', inviteLink)
+        .is('used_by', null) // Only unused invites
+        .single();
+    
+    if (error && error.code !== 'PGRST116') throw error;
     return data;
 }
 
@@ -219,6 +231,18 @@ async function markCardGenerated(memberId) {
     if (error) throw error;
 }
 
+async function updateMemberInvitedBy(memberId, invitedById) {
+    const { error } = await supabase
+        .from('inner_circle_members')
+        .update({ 
+            invited_by: invitedById,
+            is_founding_member: false // If invited, not a founding member
+        })
+        .eq('id', memberId);
+    
+    if (error) throw error;
+}
+
 module.exports = {
     supabase,
     getMemberByTelegramId,
@@ -227,11 +251,13 @@ module.exports = {
     decrementInvites,
     createInvite,
     getInviteByCode,
+    getInviteByLink,
     markInviteUsed,
     getInvitesByMember,
     getMemberStats,
     addSeededGroup,
     isSeededGroup,
     upsertMember,
-    markCardGenerated
+    markCardGenerated,
+    updateMemberInvitedBy
 };
