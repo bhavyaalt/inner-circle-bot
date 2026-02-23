@@ -165,9 +165,21 @@ bot.command('card', async (ctx) => {
         // Mark card as generated
         await db.markCardGenerated(member.id);
         
+        const caption = `✨ Your Inner Circle member card
+
+By the power vested in us by FBI, we now give you the right to bring in your trusted folks into the Inner Circle.
+
+If FBI lived up to the expectations and made your life good, Inner Circle will only make it better.
+
+Share this card on socials and make sure to share a little about your journey alongside. Use your invite links wisely.
+
+Love,
+Core FBI
+Now, call us Inner Circle.`;
+        
         await ctx.replyWithPhoto(
             { source: cardBuffer },
-            { caption: '✨ Your Inner Circle member card' }
+            { caption }
         );
         
     } catch (error) {
