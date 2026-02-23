@@ -112,21 +112,18 @@ bot.command('invite', async (ctx) => {
         const botUsername = ctx.botInfo.username;
         const inviteLink = `https://t.me/${botUsername}?start=${invite.code}`;
         
-        let message = `🎟️ **Your Invite Link**\n\n` +
-            `\`${inviteLink}\`\n\n` +
-            `Share this link with someone to invite them.\n` +
-            `⏰ Expires in 7 days\n\n` +
-            `You have ${member.invites_remaining - 1} invite(s) remaining.`;
+        const remainingInvites = member.invites_remaining - 1;
+        const invitesText = remainingInvites > 0 
+            ? `Want to invite more folks? We have ${remainingInvites} more invite code${remainingInvites > 1 ? 's' : ''} for you, prompt the bot again.`
+            : `That was your last invite code. Use it wisely!`;
         
-        if (targetUsername) {
-            message = `🎟️ **Invite for @${targetUsername}**\n\n` +
-                `\`${inviteLink}\`\n\n` +
-                `Share this with @${targetUsername}\n` +
-                `⏰ Expires in 7 days\n\n` +
-                `You have ${member.invites_remaining - 1} invite(s) remaining.`;
-        }
+        const message = `🎟️ Your Invite code, use it wisely!\n\n` +
+            `${inviteLink}\n\n` +
+            `Share this link with someone you think is worth adding to the Inner Circle, wink wink.\n\n` +
+            `Act quick the code expires in 7 days.\n\n` +
+            `${invitesText}`;
         
-        await ctx.replyWithMarkdown(message);
+        await ctx.reply(message);
         
     } catch (error) {
         console.error('Invite error:', error);
