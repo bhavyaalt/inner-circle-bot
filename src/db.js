@@ -73,13 +73,19 @@ async function decrementInvites(memberId) {
 async function createInvite(createdById, targetUsername = null) {
     const code = generateInviteCode();
     
+    const insertData = {
+        code,
+        created_by: createdById
+    };
+    
+    // Only include target_username if provided (column may not exist in older schemas)
+    if (targetUsername) {
+        insertData.target_username = targetUsername;
+    }
+    
     const { data, error } = await supabase
         .from('inner_circle_invites')
-        .insert({
-            code,
-            created_by: createdById,
-            target_username: targetUsername
-        })
+        .insert(insertData)
         .select()
         .single();
     
@@ -182,24 +188,29 @@ async function upsertMember({ telegramId, username, firstName, lastName, isFound
     // Combine first + last name for telegram_name
     const telegramName = [firstName, lastName].filter(Boolean).join(' ') || null;
     
+    // First check if member exists
+    const existing = await getMemberByTelegramId(telegramId);
+    if (existing) return existing;
+    
+    // Create new member
     const { data, error } = await supabase
         .from('inner_circle_members')
-        .upsert({
+        .insert({
             telegram_id: telegramId,
             telegram_username: username,
             telegram_name: telegramName,
             is_founding_member: isFoundingMember,
             invited_by: invitedById,
             invites_remaining: 2
-        }, {
-            onConflict: 'telegram_id',
-            ignoreDuplicates: true  // Don't update if exists
         })
         .select()
         .single();
     
-    // Ignore duplicate errors
-    if (error && error.code !== '23505') throw error;
+    // Ignore duplicate errors (race condition)
+    if (error && error.code === '23505') {
+        return await getMemberByTelegramId(telegramId);
+    }
+    if (error) throw error;
     return data;
 }
 
