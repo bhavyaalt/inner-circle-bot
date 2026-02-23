@@ -98,7 +98,13 @@ async function downloadImage(url) {
 
 async function getProfilePhoto(bot, userId) {
     try {
-        const photos = await bot.telegram.getUserProfilePhotos(userId, 0, 1);
+        // Ensure userId is a number (Supabase may return bigint as string)
+        const numericUserId = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+        console.log(`Fetching profile photo for user ${numericUserId}`);
+        
+        const photos = await bot.telegram.getUserProfilePhotos(numericUserId, 0, 1);
+        console.log(`Found ${photos.total_count} photos for user ${numericUserId}`);
+        
         if (photos.total_count > 0) {
             const fileId = photos.photos[0][photos.photos[0].length - 1].file_id;
             const file = await bot.telegram.getFile(fileId);
