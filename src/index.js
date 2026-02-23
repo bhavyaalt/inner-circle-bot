@@ -305,9 +305,13 @@ bot.on('message', async (ctx, next) => {
         return next();
     }
     
+    console.log(`[MSG] Group ${ctx.chat.id} | User: ${ctx.from.first_name} (${ctx.from.id})`);
+    
     try {
         // Check if this is a seeded group
         const isSeeded = await db.isSeededGroup(ctx.chat.id);
+        console.log(`[MSG] Group ${ctx.chat.id} seeded: ${isSeeded}`);
+        
         if (!isSeeded) {
             return next();
         }
@@ -315,10 +319,12 @@ bot.on('message', async (ctx, next) => {
         // Check if user is already a member
         const existing = await db.getMemberByTelegramId(ctx.from.id);
         if (existing) {
+            console.log(`[MSG] User ${ctx.from.id} already a member`);
             return next();
         }
         
         // Auto-add them as a founding member
+        console.log(`[MSG] Adding new member: ${ctx.from.first_name} (${ctx.from.id})`);
         await db.upsertMember({
             telegramId: ctx.from.id,
             username: ctx.from.username,
@@ -327,7 +333,7 @@ bot.on('message', async (ctx, next) => {
             isFoundingMember: true
         });
         
-        console.log(`Auto-seeded member: ${ctx.from.first_name} (${ctx.from.id})`);
+        console.log(`[MSG] Auto-seeded member: ${ctx.from.first_name} (${ctx.from.id})`);
         
     } catch (error) {
         console.error('Auto-seed error:', error.message);
