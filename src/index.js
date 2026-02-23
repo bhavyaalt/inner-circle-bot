@@ -108,11 +108,15 @@ bot.command('invite', async (ctx) => {
         const expireDate = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days
         const inviterName = member.telegram_name || member.telegram_username || `User ${telegramId}`;
         
+        console.log(`Creating invite link for group ${INNER_CIRCLE_GROUP_ID}, expires at ${expireDate}`);
+        
         const inviteLink = await ctx.telegram.createChatInviteLink(INNER_CIRCLE_GROUP_ID, {
             expire_date: expireDate,
             member_limit: 1, // Single use
             name: `Invite by ${inviterName}` // For tracking in Telegram admin panel
         });
+        
+        console.log('Invite link created:', JSON.stringify(inviteLink, null, 2));
         
         // Track in our DB
         await db.createInvite(member.id);
