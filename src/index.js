@@ -84,6 +84,9 @@ bot.start(async (ctx) => {
     }
 });
 
+// Inner Circle Group ID
+const INNER_CIRCLE_GROUP_ID = -1001613656434;
+
 // Generate invite
 bot.command('invite', async (ctx) => {
     const telegramId = ctx.from.id;
@@ -101,16 +104,19 @@ bot.command('invite', async (ctx) => {
             return;
         }
         
-        // Get optional target username from args
-        const args = ctx.message.text.split(' ').slice(1);
-        const targetUsername = args[0]?.replace('@', '') || null;
+        // Create a real group invite link
+        const expireDate = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days
+        const inviterName = member.telegram_name || member.telegram_username || `User ${telegramId}`;
         
-        // Create invite
-        const invite = await db.createInvite(member.id);
+        const inviteLink = await ctx.telegram.createChatInviteLink(INNER_CIRCLE_GROUP_ID, {
+            expire_date: expireDate,
+            member_limit: 1, // Single use
+            name: `Invite by ${inviterName}` // For tracking in Telegram admin panel
+        });
+        
+        // Track in our DB
+        await db.createInvite(member.id);
         await db.decrementInvites(member.id);
-        
-        const botUsername = ctx.botInfo.username;
-        const inviteLink = `https://t.me/${botUsername}?start=${invite.code}`;
         
         const remainingInvites = member.invites_remaining - 1;
         const invitesText = remainingInvites > 0 
@@ -118,7 +124,7 @@ bot.command('invite', async (ctx) => {
             : `That was your last invite code. Use it wisely!`;
         
         const message = `🎟️ Your Invite code, use it wisely!\n\n` +
-            `${inviteLink}\n\n` +
+            `${inviteLink.invite_link}\n\n` +
             `Share this link with someone you think is worth adding to the Inner Circle, wink wink.\n\n` +
             `Act quick the code expires in 7 days.\n\n` +
             `${invitesText}`;
@@ -127,7 +133,11 @@ bot.command('invite', async (ctx) => {
         
     } catch (error) {
         console.error('Invite error:', error);
-        await ctx.reply('Something went wrong. Please try again.');
+        if (error.message?.includes('not enough rights')) {
+            await ctx.reply('❌ Bot needs admin permissions in the group to create invite links.');
+        } else {
+            await ctx.reply('Something went wrong. Please try again.');
+        }
     }
 });
 
