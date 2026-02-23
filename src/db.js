@@ -71,11 +71,16 @@ async function decrementInvites(memberId) {
 async function createInvite(createdById) {
     const code = generateInviteCode();
     
+    // Calculate expiry (7 days from now)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    
     const { data, error } = await supabase
         .from('inner_circle_invites')
         .insert({
             code,
-            created_by: createdById
+            created_by: createdById,
+            expires_at: expiresAt.toISOString()
         })
         .select()
         .single();
