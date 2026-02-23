@@ -163,7 +163,7 @@ bot.command('card', async (ctx) => {
             return;
         }
         
-        await ctx.reply('🎨 Generating your card...');
+        await ctx.reply('You have always been part of the Inner Circle, here\'s your founding member card ✨');
         
         // Get inviter name if not a founding member
         let inviterName = null;
