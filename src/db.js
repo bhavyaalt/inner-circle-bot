@@ -18,15 +18,13 @@ async function getMemberByTelegramId(telegramId) {
 }
 
 async function createMember({ telegramId, username, firstName, lastName, isFoundingMember = false, invitedById = null }) {
-    // Combine first + last name for telegram_name
-    const telegramName = [firstName, lastName].filter(Boolean).join(' ') || null;
-    
     const { data, error } = await supabase
         .from('inner_circle_members')
         .insert({
             telegram_id: telegramId,
-            telegram_username: username,
-            telegram_name: telegramName,
+            username: username,
+            first_name: firstName,
+            last_name: lastName,
             is_founding_member: isFoundingMember,
             invited_by: invitedById,
             invites_remaining: 2
@@ -185,9 +183,6 @@ async function isSeededGroup(chatId) {
 }
 
 async function upsertMember({ telegramId, username, firstName, lastName, isFoundingMember = false, invitedById = null }) {
-    // Combine first + last name for telegram_name
-    const telegramName = [firstName, lastName].filter(Boolean).join(' ') || null;
-    
     // First check if member exists
     const existing = await getMemberByTelegramId(telegramId);
     if (existing) return existing;
@@ -197,8 +192,9 @@ async function upsertMember({ telegramId, username, firstName, lastName, isFound
         .from('inner_circle_members')
         .insert({
             telegram_id: telegramId,
-            telegram_username: username,
-            telegram_name: telegramName,
+            username: username,
+            first_name: firstName,
+            last_name: lastName,
             is_founding_member: isFoundingMember,
             invited_by: invitedById,
             invites_remaining: 2
